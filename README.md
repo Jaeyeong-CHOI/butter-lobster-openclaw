@@ -2,27 +2,32 @@
 
 ![Butter Lobster OpenClaw mascot](assets/butter-lobster-openclaw-v6.png)
 
-바로 가져다 쓸 수 있는 **OpenClaw 공개 스타터**입니다.
+A reusable **public OpenClaw starter kit** with practical prompts, workflow rules, and a sample skill.
 
-목표:
-- 처음 설치한 사람이 빠르게 실행해보기
-- 프롬프트/운영 규칙(md)과 예시 스킬을 재사용
-- 팀/개인 워크스페이스에 맞게 쉽게 커스터마이즈하기
+> Korean version: [README.ko.md](README.ko.md)
 
 ---
 
-## 1) 빠른 시작
+## Why this repo
+
+- Start a new OpenClaw setup quickly
+- Reuse prompt/rules markdown files safely
+- Adapt the workspace for personal or team use
+
+---
+
+## Quick start
 
 ```bash
-git clone https://github.com/Jaeyeong-CHOI/butter-lobster-openclaw.git
+git clone <your-repo-url>
 cd butter-lobster-openclaw
 mkdir -p ~/.openclaw
 cp starter/openclaw.sample.json ~/.openclaw/openclaw.json
 ```
 
-그 다음 `~/.openclaw/openclaw.json`에서 토큰/채널 설정만 채우면 됩니다.
+Then fill your tokens/channel settings in `~/.openclaw/openclaw.json`.
 
-Gateway 실행:
+Start gateway:
 
 ```bash
 openclaw gateway start
@@ -31,33 +36,42 @@ openclaw gateway status
 
 ---
 
-## 2) 포함된 것
+## What’s included
 
-- 운영 프롬프트/규칙 md
+- Core prompt/rules markdown
   - `AGENTS.md`, `SOUL.md`, `HEARTBEAT.md`, `docs/*`
-- 재사용 프롬프트 템플릿
+- Reusable prompt templates
   - `agent-prompts/*`
-- 예시 스킬 (보고서/슬라이드 포맷)
+- Example skill (report + slides format)
   - `skills/latex-report-format/*`
-  - 배포 패키지: `skills/dist/latex-report-format.skill`
-- 모델 라우팅 유틸
+  - packaged file: `skills/dist/latex-report-format.skill`
+- ACP default-agent sync utility
   - `config/sync_acp_default_agent.py`
-- 샘플 설정
+- Starter config
   - `starter/openclaw.sample.json`
 
 ---
 
-## 3) 커스터마이즈 포인트
+## Customization points
 
-- 본인 스타일: `SOUL.md`
-- 작업 규칙: `AGENTS.md`
-- 주기 점검: `HEARTBEAT.md`
-- 포맷 스킬: `skills/latex-report-format/`
-- 기본 ACP 라우팅 동기화: `config/sync_acp_default_agent.py`
+- Assistant tone/identity: `SOUL.md`
+- Execution rules: `AGENTS.md`
+- Recurring checks: `HEARTBEAT.md`
+- Formatting skill: `skills/latex-report-format/`
+- Model-based ACP routing sync: `config/sync_acp_default_agent.py`
 
 ---
 
-## 4) 주의
+## Open-source basics
 
-- 실제 비밀키/토큰은 절대 repo에 커밋하지 마세요.
-- 공개용/개인용 워크스페이스를 분리해서 운영하는 것을 권장합니다.
+- License: [MIT](LICENSE)
+- Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Code of Conduct: [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- Security policy: [SECURITY.md](SECURITY.md)
+
+---
+
+## Notes
+
+- Never commit real secrets/tokens.
+- Keep a separate private workspace for personal memories and sensitive files.
