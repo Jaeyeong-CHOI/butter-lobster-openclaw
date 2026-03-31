@@ -28,7 +28,7 @@
   </g>
 
   <!-- lobster mascot -->
-  <g transform="translate(420 78)" filter="url(#softShadow)">
+  <g transform="translate(500 86)" filter="url(#softShadow)">
     <!-- tail -->
     <ellipse cx="115" cy="245" rx="68" ry="28" fill="#c6382a"/>
 
@@ -86,10 +86,11 @@
   </g>
 
   <!-- title -->
-  <g transform="translate(650 146)">
-    <text x="0" y="0" font-family="Arial, sans-serif" font-size="44" font-weight="800" fill="#7a2d23">Butter Lobster</text>
-    <text x="0" y="48" font-family="Arial, sans-serif" font-size="40" font-weight="800" fill="#7a2d23">OpenClaw</text>
-    <text x="0" y="94" font-family="Arial, sans-serif" font-size="20" fill="#8e5e20">friendly public starter kit</text>
+  <g transform="translate(64 92)">
+    <rect x="-8" y="-44" width="430" height="138" rx="20" fill="#fff9ea" stroke="#f0d68f" stroke-width="3" opacity="0.95"/>
+    <text x="12" y="8" font-family="Arial, sans-serif" font-size="50" font-weight="800" fill="#7a2d23">Butter Lobster</text>
+    <text x="12" y="58" font-family="Arial, sans-serif" font-size="46" font-weight="800" fill="#7a2d23">OpenClaw</text>
+    <text x="14" y="90" font-family="Arial, sans-serif" font-size="21" fill="#8e5e20">friendly public starter kit</text>
   </g>
 
   <!-- sparkles -->
