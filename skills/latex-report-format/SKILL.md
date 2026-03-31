@@ -1,49 +1,79 @@
 ---
 name: latex-report-format
-description: Apply a reusable LaTeX house format and reuse it for PDF and PPT deliverables. Use when asked to draft or edit technical reports in a consistent style, compile .tex into final PDFs, or convert the same report structure into slide decks (Beamer/PPT outline). Trigger on requests like "포맷으로 작성", "LaTeX 템플릿 불러와", "보고서 PDF 만들어", or "이 보고서로 발표자료/PPT 만들어".
+description: Apply a reusable LaTeX house format (colors, typography, section styling, table styling) and produce matching PDF and presentation outputs. Use when asked to draft/edit styled reports, compile .tex to final PDF, or build polished PPT/Beamer slides that preserve the same design language.
 ---
 
 # LaTeX Report Format
 
 ## Quick start workflow
 
-1. Read `references/template-links.md` to find canonical template sources.
-2. Read `references/format-rules.md` and lock those constraints before writing.
-3. If no local base file exists, copy `assets/templates/report_template.tex` as the working draft.
-4. Draft or edit sections while preserving the format constraints.
+1. Read `references/format-rules.md` and lock style constraints.
+2. If user provides an existing LaTeX house template, preserve:
+   - palette (`\definecolor`),
+   - fonts (`fontspec`, `kotex`),
+   - section/table/box styles (`titlesec`, `tcolorbox`, table heads).
+3. Build report from `assets/templates/report_template.tex` (or user template).
+4. Build slides from:
+   - `assets/templates/slides_beamer.tex` (LaTeX path), or
+   - `assets/templates/slides_outline.md` + `scripts/build_styled_pptx.py` (PPTX path).
 5. Compile with `scripts/compile_latex.sh <path/to/main.tex>`.
-6. If slide output is requested, map sections with `references/ppt-mapping.md` and start from:
-   - `assets/templates/slides_beamer.tex` (LaTeX Beamer), or
-   - `assets/templates/slides_outline.md` (PPT outline source).
+6. Return artifact paths + style checklist.
 
 ## Non-negotiable style constraints
 
-Apply all constraints from `references/format-rules.md`.
-If a user asks to override any constraint, follow the user instruction and clearly note which rule changed.
+- Preserve design tokens (color/font/hierarchy) unless user explicitly overrides.
+- Do not downgrade to plain default PPT/LaTeX style.
+- Prioritize readability: spacing, contrast, clear visual hierarchy.
+
+## PPT quality checklist (required)
+
+- 16:9 canvas with consistent margins
+- Strong title hierarchy (Title / Subtitle / Body)
+- 1 core message per slide
+- Body text size readable at distance (>= 20pt)
+- Consistent accent color and card style
+- Avoid dense full-text paragraphs
+
+## Personalization fields (required if user asks)
+
+Support these optional metadata fields in both report and slides:
+
+- `author_display_name` (e.g., 작성자 이름)
+- `course_name` (e.g., 수업명/세미나명)
+- `affiliation` (소속)
+- `date_label` (발표/제출 날짜 라벨)
+
+When provided, render them in:
+
+- Report: cover page + header/footer identity line
+- Slides: title slide subtitle/footer area
+
+If not provided, keep neutral placeholders.
 
 ## Output contract
 
-### For report/PDF tasks
+### Report/PDF
 
 Return:
+- edited file list
+- compile command + engine
+- output PDF path
+- style checklist (palette/font/section/table)
+- personalization checklist (name/course/affiliation/date)
 
-- Edited file list
-- Compile command used
-- Output PDF path
-- Constraint checklist status (pass/fail per rule)
-
-### For PPT/slide tasks
+### Slides/PPT
 
 Return:
-
-- Slide source file path (`.tex` or `.md`)
-- Slide-by-slide outline
-- Open placeholders requiring user input (e.g., figures not selected yet)
+- source file path (`.tex` or `.py/.md`)
+- output slide path (`.pptx` or `.pdf`)
+- slide-by-slide outline
+- style checklist (hierarchy/readability/consistency)
+- personalization checklist (name/course/affiliation/date)
 
 ## Resource map
 
 - Rules: `references/format-rules.md`
-- Canonical links: `references/template-links.md`
-- Section→slide mapping: `references/ppt-mapping.md`
+- Report→slide mapping: `references/ppt-mapping.md`
 - Compile helper: `scripts/compile_latex.sh`
+- PPT generator helper: `scripts/build_styled_pptx.py`
 - Templates: `assets/templates/*`

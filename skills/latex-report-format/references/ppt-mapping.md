@@ -1,27 +1,41 @@
 # Report → PPT mapping
 
-Use this mapping to convert a LaTeX report structure into presentation slides.
+Use this mapping to convert a LaTeX report into a concise presentation.
 
-## Recommended 10-slide baseline
+## Recommended 8-slide baseline
 
-1. Title + authors + affiliation
-2. Problem statement and motivation
-3. Dataset/task setup
-4. Method overview (pipeline)
-5. Experimental setup
-6. Main results (core metrics only)
-7. Ablation/robustness highlights
-8. Feedback and direction updates
-9. Current direction / next steps
-10. Conclusion + discussion points
+1. Title + one-line objective
+2. Problem / motivation
+3. Method overview
+4. Core mechanism or equation
+5. Results summary
+6. Practical impact
+7. Limitations and follow-up work
+8. Takeaways + next steps
 
-## Compression/expansion rules
+## Design constraints
 
-- For short decks (5-7 slides): merge 3+4, 5+6, and 8+9.
-- For long decks (12+ slides): split results into per-dataset/per-metric slides.
+- 16:9 canvas
+- Single visual language from report palette
+- Clear title hierarchy and breathing room
+- One message per slide
+- Prefer bullets/cards over dense paragraphs
+
+## Typography guidance
+
+- Slide title: 34–44 pt
+- Section subtitle: 22–28 pt
+- Body bullets: 20–26 pt
+- Footer/meta: 11–13 pt
+
+## Conversion rules
+
+- Merge adjacent low-priority sections
+- Keep only core metrics
+- Move long technical derivations to appendix slides if needed
 
 ## Visual policy
 
-- Keep one message per slide.
-- Prefer large tables over dense paragraphs only when readability is preserved.
-- Mark unresolved figures with TODO placeholders instead of inventing numbers.
+- Use simple cards/containers for grouping
+- Keep high contrast text
+- Maintain consistent left alignment unless intentional emphasis
