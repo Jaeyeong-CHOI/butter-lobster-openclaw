@@ -1,4 +1,6 @@
-# butter-openclaw
+# butter-lobster-openclaw
+
+![Butter Lobster OpenClaw mascot](assets/butter-lobster-openclaw.svg)
 
 바로 가져다 쓸 수 있는 **OpenClaw 공개 스타터**입니다.
 
@@ -12,8 +14,8 @@
 ## 1) 빠른 시작
 
 ```bash
-git clone https://github.com/Jaeyeong-CHOI/butter-openclaw.git
-cd butter-openclaw
+git clone https://github.com/Jaeyeong-CHOI/butter-lobster-openclaw.git
+cd butter-lobster-openclaw
 mkdir -p ~/.openclaw
 cp starter/openclaw.sample.json ~/.openclaw/openclaw.json
 ```
