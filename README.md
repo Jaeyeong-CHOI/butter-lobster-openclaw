@@ -1,6 +1,6 @@
 # butter-openclaw
 
-`oh-my-claudecode` 느낌으로 바로 가져다 쓸 수 있는 **OpenClaw 공개 스타터**입니다.
+바로 가져다 쓸 수 있는 **OpenClaw 공개 스타터**입니다.
 
 목표:
 - 처음 설치한 사람이 빠르게 실행해보기
