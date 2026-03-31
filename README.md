@@ -1,6 +1,6 @@
 # butter-lobster-openclaw
 
-![Butter Lobster OpenClaw mascot](assets/butter-lobster-openclaw-v3.svg)
+![Butter Lobster OpenClaw mascot](assets/butter-lobster-openclaw-v4.svg)
 
 바로 가져다 쓸 수 있는 **OpenClaw 공개 스타터**입니다.
 

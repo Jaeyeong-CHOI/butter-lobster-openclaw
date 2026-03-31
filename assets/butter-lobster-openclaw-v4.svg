@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="560" viewBox="0 0 1400 560" role="img" aria-label="Butter Lobster OpenClaw mascot v4">
+  <rect x="0" y="0" width="1400" height="560" rx="28" fill="#F9EDC9"/>
+
+  <!-- plate -->
+  <ellipse cx="560" cy="450" rx="330" ry="52" fill="#D8CCAE"/>
+  <ellipse cx="560" cy="444" rx="312" ry="40" fill="#ECE2CA"/>
+
+  <!-- butter block behind lobster -->
+  <g>
+    <rect x="330" y="300" width="190" height="120" rx="18" fill="#FFE46D" stroke="#D8B645" stroke-width="6"/>
+    <rect x="348" y="322" width="154" height="24" rx="8" fill="#FFF6A8"/>
+    <text x="425" y="383" text-anchor="middle" font-family="Arial, sans-serif" font-size="36" font-weight="700" fill="#7A5A00">BUTTER</text>
+  </g>
+
+  <!-- lobster (left) -->
+  <g transform="translate(250 120)">
+    <!-- antennas -->
+    <path d="M190 86 C130 20 62 18 12 38" fill="none" stroke="#B73327" stroke-width="10" stroke-linecap="round"/>
+    <path d="M350 86 C410 20 478 18 528 38" fill="none" stroke="#B73327" stroke-width="10" stroke-linecap="round"/>
+
+    <!-- arms -->
+    <path d="M130 220 C70 212 24 190 -22 160" fill="none" stroke="#D54436" stroke-width="22" stroke-linecap="round"/>
+    <path d="M410 220 C470 212 516 190 562 160" fill="none" stroke="#D54436" stroke-width="22" stroke-linecap="round"/>
+
+    <!-- claws -->
+    <ellipse cx="-58" cy="144" rx="36" ry="26" fill="#E24B3B"/>
+    <path d="M-90 144 q-24 -24 0 -40 q22 8 32 24 q-10 14 -32 16z" fill="#C83A2D"/>
+    <ellipse cx="598" cy="144" rx="36" ry="26" fill="#E24B3B"/>
+    <path d="M630 144 q24 -24 0 -40 q-22 8 -32 24 q10 14 32 16z" fill="#C83A2D"/>
+
+    <!-- body -->
+    <ellipse cx="270" cy="220" rx="170" ry="138" fill="#E95543"/>
+    <ellipse cx="270" cy="318" rx="98" ry="40" fill="#CB3B2D"/>
+
+    <!-- face highlight -->
+    <ellipse cx="270" cy="206" rx="108" ry="86" fill="#FF8F7C" opacity="0.28"/>
+
+    <!-- eyes -->
+    <circle cx="214" cy="176" r="20" fill="#FFFFFF"/>
+    <circle cx="326" cy="176" r="20" fill="#FFFFFF"/>
+    <circle cx="220" cy="180" r="8" fill="#222222"/>
+    <circle cx="332" cy="180" r="8" fill="#222222"/>
+
+    <!-- smile -->
+    <path d="M204 250 Q270 300 336 250" fill="none" stroke="#FFF3EC" stroke-width="10" stroke-linecap="round"/>
+
+    <!-- shell bands -->
+    <path d="M170 210 H370" stroke="#B93629" stroke-width="8" opacity="0.45"/>
+    <path d="M154 246 H386" stroke="#B93629" stroke-width="8" opacity="0.45"/>
+
+    <!-- melting butter on head -->
+    <g transform="translate(220 92)">
+      <rect x="0" y="0" width="100" height="48" rx="12" fill="#FFE46D" stroke="#D8B645" stroke-width="4"/>
+      <rect x="10" y="8" width="80" height="12" rx="6" fill="#FFF4A3"/>
+      <path d="M16 46 C10 62, 14 73, 26 76 C38 73, 42 62, 36 46 Z" fill="#FFE46D" stroke="#D8B645" stroke-width="3"/>
+      <path d="M44 46 C38 62, 42 75, 54 78 C66 75, 70 62, 64 46 Z" fill="#FFE46D" stroke="#D8B645" stroke-width="3"/>
+      <path d="M72 46 C66 60, 70 70, 82 73 C92 70, 96 60, 90 46 Z" fill="#FFE46D" stroke="#D8B645" stroke-width="3"/>
+    </g>
+  </g>
+
+  <!-- title panel (right) -->
+  <g transform="translate(870 150)">
+    <rect x="0" y="0" width="470" height="210" rx="22" fill="#FFF9EA" stroke="#E7CF8A" stroke-width="5"/>
+    <text x="30" y="78" font-family="Arial, sans-serif" font-size="74" font-weight="800" fill="#7A2E24">Butter Lobster</text>
+    <text x="30" y="148" font-family="Arial, sans-serif" font-size="66" font-weight="800" fill="#7A2E24">OpenClaw</text>
+    <text x="34" y="186" font-family="Arial, sans-serif" font-size="30" fill="#8A6421">friendly public starter kit</text>
+  </g>
+
+  <!-- stars -->
+  <g fill="#FFF6BF" stroke="#E9CE70" stroke-width="3">
+    <path d="M1040 90 l10 20 20 10 -20 10 -10 20 -10 -20 -20 -10 20 -10z"/>
+    <path d="M1120 400 l7 14 14 7 -14 7 -7 14 -7 -14 -14 -7 14 -7z"/>
+    <path d="M520 92 l7 14 14 7 -14 7 -7 14 -7 -14 -14 -7 14 -7z"/>
+  </g>
+</svg>
