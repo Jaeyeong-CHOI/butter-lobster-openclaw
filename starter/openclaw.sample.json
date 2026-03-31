@@ -1,0 +1,33 @@
+{
+  "agents": {
+    "list": [
+      { "id": "main" }
+    ],
+    "defaults": {
+      "id": "main",
+      "model": {
+        "primary": "openai-codex/gpt-5.3-codex"
+      }
+    }
+  },
+  "acp": {
+    "enabled": true,
+    "backend": "acpx",
+    "allowedAgents": ["codex", "claude"],
+    "defaultAgent": "codex"
+  },
+  "channels": {
+    "discord": {
+      "enabled": false,
+      "accounts": {
+        "default": {
+          "token": "<DISCORD_BOT_TOKEN>"
+        }
+      },
+      "threadBindings": {
+        "enabled": true,
+        "spawnAcpSessions": true
+      }
+    }
+  }
+}
