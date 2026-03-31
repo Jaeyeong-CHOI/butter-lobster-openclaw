@@ -1,20 +1,45 @@
-# Secrets
+# =========================================
+# Secrets / credentials
+# =========================================
 .env
 .env.*
 !.env.example
 
-# OpenClaw internal state
+# =========================================
+# OpenClaw runtime state
+# =========================================
 .openclaw/
 .cron-state/
 .cron_state/
 
-# Sub-project repos (each has own GitHub repo)
+# =========================================
+# Private local context (never publish)
+# =========================================
+memory/
+MEMORY.md
+USER.md
+TOOLS.md
+config/mcporter.json
+
+# Local-only project notes
+# (kept on this machine, excluded from public repo)
+docs/DECISIONS.md
+docs/TASKS.md
+docs/patterns.md
+docs/research/
+research-agent/
+agent-prompts/prompts/research/
+
+# =========================================
+# Local sub-project folders/symlinks
+# =========================================
 *_ARCHIVE/
 *_DATA/
 *_QUERY_GEN/
 *-data/
 *-benchmark/
 *-Benchmark/
+*-project
 *-project/
 *-ops/
 *-guide/
@@ -29,33 +54,31 @@
 profile-web-*/
 n8n-*/
 
-# Temp & backup
+# =========================================
+# Temp / backups
+# =========================================
 tmp/
-tmp_ingest/
-tmp_drive_merge/
+tmp_*/
 backups/
 mismatch-site/
 
-# Private local context (do not publish)
-memory/
-MEMORY.md
-USER.md
-TOOLS.md
-config/mcporter.json
-
-# Python
+# =========================================
+# Python / Node
+# =========================================
 .venv/
 __pycache__/
 *.pyc
-
-# Node
 node_modules/
 
-# OS
+# =========================================
+# OS junk
+# =========================================
 .DS_Store
 Thumbs.db
 
-# Large files
+# =========================================
+# Large binaries
+# =========================================
 *.zip
 *.tar.gz
 *.sif
