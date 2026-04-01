@@ -82,3 +82,5 @@ Thumbs.db
 *.zip
 *.tar.gz
 *.sif
+projects/
+reviews/

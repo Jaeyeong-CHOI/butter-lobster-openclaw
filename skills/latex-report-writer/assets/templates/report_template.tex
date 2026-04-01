@@ -1,0 +1,118 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.5cm, top=3cm, bottom=3cm]{geometry}
+\usepackage{fontspec}
+\usepackage{kotex}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{tcolorbox}
+\usepackage{tabularx}
+\usepackage{colortbl}
+\usepackage{setspace}
+
+% Typography (macOS baseline)
+\setmainfont[BoldFont=AppleSDGothicNeo-Bold, ItalicFont=AppleSDGothicNeo-Light]{AppleSDGothicNeo-Regular}
+\setsansfont[BoldFont=AppleSDGothicNeo-Bold]{AppleSDGothicNeo-Regular}
+\setmonofont{Menlo}
+
+% Palette
+\definecolor{themeNavy}{RGB}{14, 32, 80}
+\definecolor{themeBlue}{RGB}{26, 60, 140}
+\definecolor{themeMid}{RGB}{60, 100, 180}
+\definecolor{themeLight}{RGB}{220, 230, 250}
+\definecolor{accentGreen}{RGB}{39, 130, 67}
+\definecolor{bgLight}{RGB}{248, 249, 252}
+\definecolor{tableHead}{RGB}{26, 60, 140}
+
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, urlcolor=blue!60!black}
+
+% Header/Footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\color{themeBlue}\textbf{PROJECT} | REPORT}
+\fancyhead[R]{\small\color{gray} Monthly Summary}
+\fancyfoot[C]{\small\color{gray}\thepage}
+\renewcommand{\headrulewidth}{0.5pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{themeBlue}\leaders\hrule height \headrulewidth\hfill}}
+
+% Section style
+\titleformat{\section}
+  {\large\bfseries\color{themeNavy}}
+  {\colorbox{themeBlue}{\textcolor{white}{\enspace\thesection\enspace}}}
+  {0.8em}{}[\vspace{2pt}\color{themeBlue}\hrule height 0.8pt\vspace{4pt}]
+\titleformat{\subsection}
+  {\normalsize\bfseries\color{themeBlue}}
+  {\thesubsection}{0.6em}{}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\setlength{\headheight}{22pt}
+\addtolength{\topmargin}{-10pt}
+\onehalfspacing
+
+\newenvironment{keybox}[1]{%
+  \begin{tcolorbox}[colback=bgLight, colframe=themeBlue!60,
+    title={\small\bfseries\color{white}#1},
+    coltitle=white, colbacktitle=themeBlue,
+    left=6pt, right=6pt, top=4pt, bottom=4pt,
+    boxrule=0.6pt]
+}{\end{tcolorbox}}
+
+\begin{document}
+\begin{titlepage}
+\pagecolor{themeNavy}
+\color{white}
+\vspace*{1.8cm}
+\begin{center}
+{\small\color{themeLight}\textbf{[course\_name]}}\\[1.2cm]
+{\Large\bfseries [보고서 제목 (한글)]}\\[0.4cm]
+{\normalsize\color{themeLight}[Report Title (English)]}\\[1.0cm]
+{\Large\bfseries\color{themeLight}[date\_label]}\\[0.6cm]
+{\normalsize\color{themeLight}작성: [author\_display\_name]\\소속: [affiliation]}
+\vfill
+\end{center}
+\end{titlepage}
+\pagecolor{white}\color{black}
+
+\tableofcontents
+\newpage
+
+\section{Summary}
+\begin{keybox}{핵심 요약}
+Write 2--4 sentences for key outcomes.
+\end{keybox}
+
+\section{Background and Motivation}
+Write background.
+
+\section{Method}
+Write method.
+
+\section{Results}
+\begin{table}[H]
+\centering\small
+\begin{tabularx}{\linewidth}{|l|X|c|}
+\hline
+\rowcolor{tableHead}\textcolor{white}{\textbf{Metric}} & \textcolor{white}{\textbf{Description}} & \textcolor{white}{\textbf{Value}} \\
+\hline
+Example & Placeholder & N/A \\
+\hline
+\end{tabularx}
+\caption{Result summary}
+\end{table}
+
+\clearpage
+\section{Current Direction}
+Write next direction.
+
+\section{Action Items}
+Write action items.
+
+\end{document}

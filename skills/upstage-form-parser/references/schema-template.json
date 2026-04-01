@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "properties": {
+    "document_type": { "type": "string" },
+    "applicant_name": { "type": "string" },
+    "organization": { "type": "string" },
+    "date": { "type": "string" },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "value": { "type": "string" }
+        },
+        "required": ["name", "value"],
+        "additionalProperties": false
+      }
+    },
+    "total_amount": { "type": "string" },
+    "notes": { "type": "string" }
+  },
+  "required": ["document_type", "applicant_name", "date"],
+  "additionalProperties": false
+}

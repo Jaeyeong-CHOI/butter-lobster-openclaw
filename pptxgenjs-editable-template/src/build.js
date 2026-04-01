@@ -21,18 +21,23 @@ function parseArgs(argv) {
 }
 
 function addMeta(slide, C, FONT, dark = false) {
-  const metaColor = dark ? C.light : C.muted;
+  const footerColor = dark ? C.light : C.muted;
+  const dateColor = dark ? C.light : 'FFFFFF';
+
+  // top-right date (white on body top blue ribbon)
   slide.addText(META.date, {
     x: 11.0, y: 0.05, w: 2.2, h: 0.18,
-    fontFace: FONT, fontSize: 9, bold: true, color: metaColor, align: 'right',
+    fontFace: FONT, fontSize: 9, bold: true, color: dateColor, align: 'right',
   });
+
+  // bottom meta
   slide.addText(META.author, {
     x: 0.3, y: 7.2, w: 3.8, h: 0.2,
-    fontFace: FONT, fontSize: 9, color: metaColor,
+    fontFace: FONT, fontSize: 9, color: footerColor,
   });
   slide.addText(META.title, {
     x: 8.0, y: 7.2, w: 5.0, h: 0.2,
-    fontFace: FONT, fontSize: 9, color: metaColor, align: 'right',
+    fontFace: FONT, fontSize: 9, color: footerColor, align: 'right',
   });
 }
 
@@ -111,26 +116,26 @@ function buildDeck(themeName = 'dgist-report', outPath = null) {
   {
     const s = pptx.addSlide();
     s.background = { color: C.navy };
-    s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 0.28, fill: { color: C.blue }, line: { color: C.blue } });
 
+    // keep cover identity text (requested), remove only very bottom meta line
     s.addText('DGIST / RESEARCH SEMINAR', {
       x: 4.2, y: 0.9, w: 5.0, h: 0.2,
       fontFace: FONT, fontSize: 10.5, bold: true, color: C.light, align: 'center',
     });
 
     s.addShape(pptx.ShapeType.roundRect, {
-      x: 1.9, y: 1.35, w: 9.5, h: 2.35,
+      x: 1.9, y: 1.8, w: 9.5, h: 2.35,
       rectRadius: 0.08,
       fill: { color: 'FFFFFF', transparency: 88 },
       line: { color: C.mid, pt: 1 },
     });
 
     s.addText('Attention Is All You Need', {
-      x: 2.2, y: 1.75, w: 8.9, h: 0.8,
+      x: 2.2, y: 2.2, w: 8.9, h: 0.8,
       fontFace: FONT, fontSize: 38, bold: true, color: C.light, align: 'center',
     });
     s.addText('Transformer Architecture Brief', {
-      x: 2.2, y: 2.55, w: 8.9, h: 0.35,
+      x: 2.2, y: 3.0, w: 8.9, h: 0.35,
       fontFace: FONT, fontSize: 17, color: C.light, align: 'center',
     });
 
@@ -147,8 +152,6 @@ function buildDeck(themeName = 'dgist-report', outPath = null) {
       x: 2.9, y: 4.7, w: 7.5, h: 1.2,
       fontFace: FONT, fontSize: 13, color: C.light, align: 'center',
     });
-
-    addMeta(s, C, FONT, true);
   }
 
   // Slide 2: Context
