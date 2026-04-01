@@ -1,0 +1,55 @@
+const THEMES = {
+  'dgist-report': {
+    label: 'DGIST Report',
+    font: 'Arial',
+    colors: {
+      navy: '0E2050',
+      blue: '1A3C8C',
+      mid: '3C64B4',
+      light: 'DCE6FA',
+      bg: 'F8F9FC',
+      card: 'FFFFFF',
+      line: 'D8E1F3',
+      text: '232632',
+      muted: '62709A',
+      softPurple: 'F8F0FF',
+      softOrange: 'FFF7EB',
+    },
+  },
+  'minimal-light': {
+    label: 'Minimal Light',
+    font: 'Calibri',
+    colors: {
+      navy: '1A1A1A',
+      blue: '2E5BFF',
+      mid: '6F8EFF',
+      light: 'EAF0FF',
+      bg: 'FCFCFD',
+      card: 'FFFFFF',
+      line: 'E6E8EF',
+      text: '1F2430',
+      muted: '6B7280',
+      softPurple: 'F5F3FF',
+      softOrange: 'FFF7ED',
+    },
+  },
+  'academic-dark': {
+    label: 'Academic Dark',
+    font: 'Arial',
+    colors: {
+      navy: '0B1220',
+      blue: '3557D6',
+      mid: '6A84E8',
+      light: 'C8D4FA',
+      bg: '111827',
+      card: '1F2937',
+      line: '2F3C52',
+      text: 'E5E7EB',
+      muted: '9CA3AF',
+      softPurple: '2D1F45',
+      softOrange: '3A2B1C',
+    },
+  },
+};
+
+module.exports = { THEMES };

@@ -17,6 +17,11 @@ When a prior LaTeX house template exists, preserve these elements:
 - **Structure:** consistent table header styling and key boxes (`tcolorbox`/similar)
 - **Header/Footer:** page identity (`fancyhdr`), page number styling
 
+For PPT outputs, mirror report tokens as closely as possible:
+- same base colors (e.g., navy/blue/light background accents)
+- same metadata rhythm (header strip + footer identity)
+- same information grouping style (boxed sections/tables)
+
 If user asks to change style, apply requested override and note it explicitly.
 
 ## 3) Engine rule
@@ -45,10 +50,11 @@ If user asks to change style, apply requested override and note it explicitly.
 
 If user provides identity/class metadata, place consistently:
 
-- `author_display_name`: report cover "작성" line, slide title/subtitle, footer credit
-- `course_name`: report cover and slide subtitle (or header ribbon)
-- `affiliation`: report cover info table and first/last slide footer
-- `date_label`: report cover date + slide footer date
+- `author_display_name`: report cover "작성" line, and **slide bottom-left**
+- `presentation_title`: report title and **slide bottom-right**
+- `course_name`: report cover and slide subtitle/header ribbon
+- `affiliation`: report cover info table and title slide subtitle context
+- `date_label`: report cover date and **slide top-right**
 
 Do not invent personal details. Use placeholders when absent.
 

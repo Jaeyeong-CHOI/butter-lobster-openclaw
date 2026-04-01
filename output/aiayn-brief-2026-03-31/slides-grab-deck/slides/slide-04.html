@@ -1,0 +1,35 @@
+<!doctype html><html><head><link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"><style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  width: 720pt;
+  height: 405pt;
+  font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  background: #f8f9fc;
+  color: #232632;
+  position: relative;
+  overflow: hidden;
+}
+.topbar{position:absolute;left:0;top:0;width:100%;height:16pt;background:#1a3c8c;}
+.meta-date{position:absolute;right:14pt;top:2pt;font-size:8pt;color:#e7efff;font-weight:700;}
+.footer-left{position:absolute;left:14pt;bottom:8pt;font-size:8pt;color:#62709a;}
+.footer-right{position:absolute;right:14pt;bottom:8pt;font-size:8pt;color:#62709a;}
+.sec-num{position:absolute;left:18pt;top:28pt;width:22pt;height:16pt;border-radius:3pt;background:#1a3c8c;color:white;font-size:10pt;font-weight:700;display:flex;align-items:center;justify-content:center;}
+.sec-title{position:absolute;left:46pt;top:26pt;font-size:26pt;color:#0e2050;font-weight:800;letter-spacing:-0.02em;}
+.sec-line{position:absolute;left:46pt;top:49pt;width:650pt;height:2pt;background:#1a3c8c;}
+.sec-sub{position:absolute;left:48pt;top:54pt;font-size:11pt;color:#62709a;}
+.card{position:absolute;background:white;border:1px solid #d8e1f3;border-radius:10pt;padding:14pt;}
+.card h3{font-size:12pt;color:#1a3c8c;margin-bottom:8pt;}
+.bullets{font-size:13pt;line-height:1.55;color:#232632;}
+.bullets li{margin-bottom:7pt;}
+
+.form{left:18pt;top:82pt;width:684pt;height:286pt;}
+.eq{position:absolute;left:34pt;top:124pt;font-size:30pt;font-weight:800;color:#1a3c8c;letter-spacing:-0.01em;}
+.exp{position:absolute;left:36pt;top:184pt;width:648pt;font-size:14pt;line-height:1.55;color:#232632;}
+.exp li{margin-bottom:6pt;}
+</style></head><body>
+<div class='topbar'></div><div class='meta-date'>2026-03-31</div><div class='footer-left'>Jaeyeong CHOI</div><div class='footer-right'>Attention Is All You Need Presentation</div>
+<div class='sec-num'>3</div><div class='sec-title'>Core mechanism</div><div class='sec-line'></div><div class='sec-sub'>scaled dot-product attention</div>
+<div class='card form'><h3>Attention formula</h3></div>
+<div class='eq'>Attention(Q, K, V) = softmax(QK<sup>T</sup>/√d<sub>k</sub>)V</div>
+<ul class='exp'><li>QK<sup>T</sup> computes token-to-token relevance</li><li>√d<sub>k</sub> scaling improves optimization stability</li><li>Weighted V aggregation builds contextual representation</li></ul>
+</body></html>
