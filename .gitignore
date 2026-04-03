@@ -77,10 +77,26 @@ node_modules/
 Thumbs.db
 
 # =========================================
+# Skills (local-only, not for public repo)
+# =========================================
+skills/
+
+# =========================================
+# Output artifacts (generated, large)
+# =========================================
+output/
+
+# =========================================
+# PPT template builder (dev-only)
+# =========================================
+pptxgenjs-editable-template/
+
+# =========================================
 # Large binaries
 # =========================================
 *.zip
 *.tar.gz
 *.sif
+*.skill
 projects/
 reviews/
