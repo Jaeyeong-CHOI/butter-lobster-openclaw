@@ -61,6 +61,7 @@ tmp/
 tmp_*/
 backups/
 mismatch-site/
+.clawhub/
 
 # =========================================
 # Python / Node

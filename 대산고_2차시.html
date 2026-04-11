@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2차시 — 학생 주제 소개 & 발표</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --r-background-color: #0a0f1a;
+  --r-main-font: 'Noto Sans KR', sans-serif;
+  --r-heading-font: 'Noto Sans KR', sans-serif;
+  --r-code-font: 'JetBrains Mono', monospace;
+  --r-main-font-size: 28px;
+  --r-heading-color: #fff;
+  --r-main-color: #c8d6e5;
+  --r-link-color: #6cb4ee;
+  --blue: #2563eb;
+  --cyan: #06b6d4;
+  --purple: #8b5cf6;
+  --green: #10b981;
+  --orange: #f59e0b;
+  --red: #ef4444;
+  --pink: #ec4899;
+  --glass: rgba(255,255,255,0.06);
+  --glass-border: rgba(255,255,255,0.1);
+}
+.reveal { font-weight: 300; }
+.reveal h1, .reveal h2, .reveal h3 { font-weight: 700; letter-spacing: -0.02em; text-shadow: none; }
+.reveal h1 { font-size: 2.5em; }
+.reveal h2 { font-size: 1.68em; }
+.reveal h3 { font-size: 1.02em; color: var(--cyan); }
+.reveal p, .reveal li { line-height: 1.6; }
+.reveal ul { list-style: none; padding: 0; margin: 0; }
+.reveal ul li { padding: 4px 0; }
+.reveal table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 0.6em; }
+.reveal table th { background: rgba(37,99,235,0.3); color: #93c5fd; padding: 10px 14px; font-weight: 600; border: none; }
+.reveal table td { padding: 10px 14px; border: none; border-bottom: 1px solid rgba(255,255,255,0.06); vertical-align: top; }
+.reveal table tr:last-child td { border-bottom: none; }
+.reveal thead th:first-child { border-radius: 10px 0 0 0; }
+.reveal thead th:last-child { border-radius: 0 10px 0 0; }
+
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 22px 26px;
+  backdrop-filter: blur(12px);
+}
+.glass-sm { padding: 16px 18px; border-radius: 12px; }
+.mini-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+.topic-card {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 16px 18px;
+  text-align: left;
+}
+.topic-card h4 { font-size: 0.72em; margin: 0 0 8px 0; color: #fff; }
+.topic-card p { margin: 0; font-size: 0.53em; color: #94a3b8; line-height: 1.55; }
+.compare-box {
+  border-radius: 14px;
+  padding: 18px 20px;
+  text-align: left;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.compare-left {
+  background: rgba(239,68,68,0.08);
+  border-color: rgba(239,68,68,0.22);
+}
+.compare-right {
+  background: rgba(16,185,129,0.08);
+  border-color: rgba(16,185,129,0.22);
+}
+
+.grad-blue { background: linear-gradient(135deg, #60a5fa, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.grad-cyan { background: linear-gradient(135deg, #22d3ee, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.grad-green { background: linear-gradient(135deg, #34d399, #06b6d4); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.grad-orange { background: linear-gradient(135deg, #fbbf24, #f97316); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.grad-pink { background: linear-gradient(135deg, #f472b6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.grad-red { background: linear-gradient(135deg, #f87171, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: left; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 18px; text-align: left; }
+.grid-4 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; text-align: left; }
+
+.badge {
+  display: inline-block; padding: 4px 14px; border-radius: 20px;
+  font-size: 0.55em; font-weight: 500; letter-spacing: 0.05em;
+  text-transform: uppercase; margin-bottom: 12px;
+}
+.badge-blue { background: rgba(37,99,235,0.25); color: #93c5fd; }
+.badge-green { background: rgba(16,185,129,0.25); color: #6ee7b7; }
+.badge-orange { background: rgba(245,158,11,0.25); color: #fcd34d; }
+.badge-purple { background: rgba(139,92,246,0.25); color: #c4b5fd; }
+.badge-pink { background: rgba(236,72,153,0.25); color: #f9a8d4; }
+.badge-red { background: rgba(239,68,68,0.25); color: #fca5a5; }
+
+.step-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: 10px;
+  font-weight: 700; font-size: 0.68em; margin-bottom: 8px;
+}
+.icon-circle {
+  width: 54px; height: 54px; border-radius: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 1.25em; margin-bottom: 8px;
+}
+
+.timeline {
+  display: grid;
+  grid-template-columns: 108px 1fr;
+  gap: 14px;
+  align-items: stretch;
+  margin-bottom: 12px;
+}
+.timeline-time {
+  background: rgba(37,99,235,0.18);
+  border: 1px solid rgba(37,99,235,0.24);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #93c5fd;
+  font-size: 0.58em;
+}
+.timeline-body {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 14px 16px;
+  text-align: left;
+  font-size: 0.58em;
+  line-height: 1.55;
+}
+
+.divider-slide { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
+.divider-slide .icon { font-size: 3em; margin-bottom: 16px; }
+.divider-slide h2 { margin-bottom: 8px; }
+
+.sm { font-size: 0.62em; color: #94a3b8; }
+.xs { font-size: 0.52em; color: #64748b; }
+.highlight { color: #fbbf24; font-weight: 500; }
+.key { color: #67e8f9; font-weight: 500; }
+
+.topic-chip {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 6px 12px;
+  margin: 4px 6px 0 0;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+  font-size: 0.5em;
+  color: #e2e8f0;
+}
+
+.blob {
+  position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.15; pointer-events: none;
+}
+.blob-1 { width: 600px; height: 600px; background: #2563eb; top: -200px; left: -200px; }
+.blob-2 { width: 500px; height: 500px; background: #8b5cf6; bottom: -200px; right: -200px; }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #1a1040 50%, #0a1628 100%)">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div style="margin-top:-40px">
+    <p class="sm" style="letter-spacing:0.15em; text-transform:uppercase; color:#64748b">대산고등학교 AI·SW 탐구 프로그램</p>
+    <h1 style="margin:16px 0 8px">
+      <span class="grad-cyan">학생 주제 소개</span> &<br>
+      <span class="grad-pink">탐구 발표</span>
+    </h1>
+    <p style="font-size:0.7em; color:#94a3b8; margin:20px 0 32px">
+      이번 차시는 <span class="highlight">RAG와 하이브리드 검색</span>을 조금 더 자세히, 쉽게 이해해 봅니다
+    </p>
+    <div style="display:flex; gap:24px; justify-content:center; font-size:0.55em; color:#64748b">
+      <span>📅 2026년 4월</span>
+      <span>👨‍🏫 최재영</span>
+      <span>👥 5명</span>
+      <span>⏱ 2시간</span>
+    </div>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #0f1a2e 100%)">
+  <h2><span class="grad-blue">오늘의 목표</span></h2>
+  <p class="sm" style="margin-bottom:24px">이번 차시는 특히 RAG를 중심으로 큰 그림을 잡고, 나머지 주제는 짧게 연결합니다</p>
+  <div class="grid-4">
+    <div class="glass glass-sm">
+      <div class="step-num" style="background:rgba(37,99,235,0.3); color:#93c5fd">1</div>
+      <h3 style="font-size:0.78em; color:#fff">LLM이 뭔지 이해</h3>
+      <p style="font-size:0.54em; color:#94a3b8">AI가 글을 만드는 기본 원리 맛보기</p>
+    </div>
+    <div class="glass glass-sm">
+      <div class="step-num" style="background:rgba(6,182,212,0.3); color:#67e8f9">2</div>
+      <h3 style="font-size:0.78em; color:#fff">벡터검색과 하이브리드 검색</h3>
+      <p style="font-size:0.54em; color:#94a3b8">같은 단어 찾기와 비슷한 뜻 찾기를 같이 이해하기</p>
+    </div>
+    <div class="glass glass-sm">
+      <div class="step-num" style="background:rgba(245,158,11,0.3); color:#fcd34d">3</div>
+      <h3 style="font-size:0.78em; color:#fff">RAG 실제 예시 보기</h3>
+      <p style="font-size:0.54em; color:#94a3b8">그냥 LLM과 RAG가 어떻게 다른지</p>
+    </div>
+    <div class="glass glass-sm">
+      <div class="step-num" style="background:rgba(139,92,246,0.3); color:#c4b5fd">4</div>
+      <h3 style="font-size:0.78em; color:#fff">학생 발표 듣는 기준 세우기</h3>
+      <p style="font-size:0.54em; color:#94a3b8">질문, 비교, 기준, 다음 단계를 중심으로 보기</p>
+    </div>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #0f1a2e 100%)">
+  <h2><span class="grad-cyan">수업 흐름</span></h2>
+  <p class="sm" style="margin-bottom:22px">1시간은 선생님 설명, 1시간은 학생 발표</p>
+  <div class="grid-2">
+    <div class="glass" style="border-left:3px solid var(--blue)">
+      <span class="badge badge-blue">Part 1 · 60분</span>
+      <h3 style="font-size:0.95em; color:#fff; margin:8px 0 14px">🎓 학생 주제 소개</h3>
+      <ul style="font-size:0.6em">
+        <li>RAG를 조금 더 자세히 설명</li>
+        <li>LLM, 벡터검색, 하이브리드 검색, 실제 예시 소개</li>
+        <li>나머지 주제는 짧게 핵심만 정리</li>
+      </ul>
+    </div>
+    <div class="glass" style="border-left:3px solid var(--orange)">
+      <span class="badge badge-orange">Part 2 · 60분</span>
+      <h3 style="font-size:0.95em; color:#fff; margin:8px 0 14px">🎤 학생 발표</h3>
+      <ul style="font-size:0.6em">
+        <li>학생 5명 발표</li>
+        <li>1인당 8분 발표 + 4분 질문</li>
+        <li>오늘 설명한 관점으로 피드백</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #111827 100%)">
+  <span class="badge badge-blue">01</span>
+  <h2><span class="grad-blue">60분 소개 운영안 (앞부분)</span></h2>
+  <p class="sm" style="margin-bottom:18px">RAG 쪽 설명 시간을 조금 더 늘렸습니다</p>
+  <div style="max-width:980px; margin:0 auto">
+    <div class="timeline">
+      <div class="timeline-time">0-8분</div>
+      <div class="timeline-body"><span class="key">공통 설명</span><br>오늘은 학생 발표를 이해하기 위한 큰 그림을 같이 잡는 시간</div>
+    </div>
+    <div class="timeline">
+      <div class="timeline-time">8-18분</div>
+      <div class="timeline-body"><span class="key">LLM</span><br>LLM이 무엇인지, 왜 말을 잘하는지 아주 쉽게 설명</div>
+    </div>
+    <div class="timeline">
+      <div class="timeline-time">18-24분</div>
+      <div class="timeline-body"><span class="key">벡터검색</span><br>키워드 검색과 무엇이 다른지, 뜻이 비슷한 문장을 찾는다는 것이 무슨 뜻인지 설명</div>
+    </div>
+    <div class="timeline">
+      <div class="timeline-time">24-30분</div>
+      <div class="timeline-body"><span class="key">하이브리드 검색</span><br>키워드 검색과 벡터검색을 왜 같이 쓰는지, 각각의 장점을 어떻게 합치는지 설명</div>
+    </div>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #111827 100%)">
+  <span class="badge badge-blue">02</span>
+  <h2><span class="grad-blue">60분 소개 운영안 (뒷부분)</span></h2>
+  <p class="sm" style="margin-bottom:18px">뒤쪽은 RAG 예시와 나머지 주제 연결</p>
+  <div style="max-width:980px; margin:0 auto">
+    <div class="timeline">
+      <div class="timeline-time">30-40분</div>
+      <div class="timeline-body"><span class="key">RAG 예시</span><br>그냥 LLM과 RAG가 답변에서 어떻게 다르게 보이는지 예시로 설명</div>
+    </div>
+    <div class="timeline">
+      <div class="timeline-time">40-52분</div>
+      <div class="timeline-body"><span class="key">나머지 주제</span><br>CNN, 랜덤, MITM, 로드밸런싱은 핵심만 짧게 연결</div>
+    </div>
+    <div class="timeline">
+      <div class="timeline-time">52-60분</div>
+      <div class="timeline-body"><span class="key">발표 안내</span><br>학생 발표를 들을 때 질문, 비교, 기준, 다음 단계를 중심으로 보기</div>
+    </div>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a1628 0%, #1e1b4b 50%, #0a1628 100%)">
+  <div class="divider-slide">
+    <div class="icon">🎓</div>
+    <span class="badge badge-blue" style="font-size:0.5em">Part 1</span>
+    <h2><span class="grad-blue">학생 주제 간략 소개</span></h2>
+    <p class="sm">이번 차시는 RAG를 조금 더 자세히 봅니다</p>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #0f1a2e 100%)">
+  <span class="badge badge-purple">03</span>
+  <h2><span class="grad-pink">오늘 볼 5개 주제</span></h2>
+  <p class="sm" style="margin-bottom:18px">다만 오늘은 첫 번째 주제인 RAG를 조금 더 깊게 봅니다</p>
+  <div class="grid-2">
+    <div class="topic-card">
+      <h4>박찬유 — 하이브리드 검색 기반 RAG</h4>
+      <p>AI가 먼저 자료를 찾고, 그 자료를 보고 답하는 방법</p>
+    </div>
+    <div class="topic-card">
+      <h4>전하율 — CNN 손글씨 숫자 인식</h4>
+      <p>컴퓨터가 숫자 사진을 보고 0~9를 맞히는 방법</p>
+    </div>
+    <div class="topic-card">
+      <h4>정윤호 — 게임에서 공정한 랜덤</h4>
+      <p>랜덤이 정말 랜덤인지, 많이 해보면 어떤 모습이 되는지</p>
+    </div>
+    <div class="topic-card">
+      <h4>박시우 — MITM 공격과 암호화</h4>
+      <p>중간에서 정보를 훔쳐보는 공격을 암호화가 어떻게 막는지</p>
+    </div>
+    <div class="topic-card" style="grid-column:1 / span 2">
+      <h4>황재민 — 로드밸런싱과 서버 과부하</h4>
+      <p>서버 일을 여러 서버에 나누면 얼마나 더 빠르고 안정적인지</p>
+    </div>
+  </div>
+  <p class="xs" style="margin-top:16px">학생별 주제는 1차시에서 “소개형”이 아니라 “비교/분석형”으로 다듬어 둔 흐름을 이어감. Source: <span class="highlight">memory/2026-04-04.md#L16</span></p>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #102033 100%)">
+  <span class="badge badge-blue">04</span>
+  <h2><span class="grad-cyan">주제 1 — RAG가 뭐야?</span></h2>
+  <div class="grid-2">
+    <div class="glass">
+      <h3 style="font-size:0.84em; color:#fff">쉽게 말하면</h3>
+      <ul style="font-size:0.57em">
+        <li>RAG는 AI가 <span class="highlight">바로 대답하지 않고</span>, 먼저 자료를 찾아보고 대답하는 방식</li>
+        <li>사람이 모르는 문제를 받으면 검색부터 하는 것과 비슷함</li>
+        <li>그래서 <span class="highlight">검색</span>과 <span class="highlight">답변 생성</span>이 같이 중요함</li>
+      </ul>
+    </div>
+    <div class="glass">
+      <h3 style="font-size:0.84em; color:#fff">왜 필요할까?</h3>
+      <ul style="font-size:0.57em">
+        <li>LLM은 말을 잘하지만 가끔 <span class="highlight">추측</span>해서 틀릴 수 있음</li>
+        <li>RAG는 문서나 자료를 찾아보고 답해서 더 정확해질 수 있음</li>
+        <li>특히 학교 규정, 회사 문서, 논문처럼 <span class="highlight">근거가 필요한 정보</span>에 유용함</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #0f1a2e 100%)">
+  <span class="badge badge-green">05</span>
+  <h2><span class="grad-green">LLM이란?</span></h2>
+  <div class="grid-2">
+    <div class="glass">
+      <h3 style="font-size:0.84em; color:#fff">아주 쉽게 말하면</h3>
+      <ul style="font-size:0.57em">
+        <li>LLM은 아주 많은 글을 읽고 <span class="highlight">다음 말을 예측</span>하는 AI</li>
+        <li>그래서 사람처럼 자연스럽게 문장을 이어 말할 수 있음</li>
+        <li>ChatGPT 같은 대화형 AI도 이런 종류에 속함</li>
+      </ul>
+    </div>
+    <div class="glass">
+      <h3 style="font-size:0.84em; color:#fff">하지만 한계도 있음</h3>
+      <ul style="font-size:0.57em">
+        <li>모르는 것도 <span class="highlight">아는 척</span>하면서 답할 수 있음</li>
+        <li>최신 문서나 내 자료는 바로 모를 수 있음</li>
+        <li>그래서 필요할 때는 <span class="highlight">밖에서 자료를 찾아와야</span> 함</li>
+      </ul>
+    </div>
+  </div>
+  <div class="glass" style="margin-top:18px; text-align:left">
+    <p style="font-size:0.6em; margin:0"><span class="highlight">비유</span>: LLM은 말을 아주 잘하는 똑똑한 친구인데, 시험 범위 밖 질문을 받으면 자신감 있게 틀릴 수도 있는 친구라고 생각하면 이해하기 쉽습니다.</p>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #111827 100%)">
+  <span class="badge badge-orange">06</span>
+  <h2><span class="grad-orange">벡터검색이란?</span></h2>
+  <div class="grid-2">
+    <div class="glass">
+      <h3 style="font-size:0.84em; color:#fff">키워드 검색과 차이</h3>
+      <ul style="font-size:0.57em">
+        <li>키워드 검색은 <span class="highlight">같은 단어</span>가 들어가야 잘 찾음</li>
+        <li>벡터검색은 문장을 숫자로 바꿔 <span class="highlight">뜻이 비슷한 것</span>을 찾음</li>
+        <li>단어가 조금 달라도 의미가 비슷하면 찾을 수 있음</li>
+      </ul>
+    </div>
+    <div class="glass">
+      <h3 style="font-size:0.84em; color:#fff">예를 들면</h3>
+      <ul style="font-size:0.57em">
+        <li>검색어: <span class="highlight">시험 일정</span></li>
+        <li>문서 제목: <span class="highlight">중간고사 날짜 안내</span></li>
+        <li>단어는 다르지만 뜻이 비슷해서 벡터검색이 잘 찾을 수 있음</li>
+      </ul>
+    </div>
+  </div>
+  <div class="glass" style="margin-top:18px; text-align:left">
+    <p style="font-size:0.6em; margin:0"><span class="highlight">한 줄 정리</span>: 벡터검색은 “같은 단어 찾기”보다 “비슷한 뜻 찾기”에 더 가깝습니다.</p>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #102033 100%)">
+  <span class="badge badge-pink">07</span>
+  <h2><span class="grad-pink">하이브리드 검색이란?</span></h2>
+  <div class="grid-2">
+    <div class="glass">
+      <h3 style="font-size:0.84em; color:#fff">왜 같이 쓸까?</h3>
+      <ul style="font-size:0.57em">
+        <li><span class="highlight">키워드 검색</span>은 정확한 단어를 찾는 데 강함</li>
+        <li><span class="highlight">벡터검색</span>은 뜻이 비슷한 문장을 찾는 데 강함</li>
+        <li>하이브리드 검색은 두 방법을 <span class="highlight">함께 사용</span>하는 방식</li>
+      </ul>
+    </div>
+    <div class="glass">
+      <h3 style="font-size:0.84em; color:#fff">쉽게 비유하면</h3>
+      <ul style="font-size:0.57em">
+        <li>한 명은 <span class="highlight">정확한 단어</span>를 잘 찾는 조교</li>
+        <li>한 명은 <span class="highlight">비슷한 뜻</span>을 잘 찾는 조교</li>
+        <li>둘이 같이 찾으면 더 안정적으로 좋은 자료를 찾을 수 있음</li>
+      </ul>
+    </div>
+  </div>
+  <div class="glass" style="margin-top:18px; text-align:left">
+    <p style="font-size:0.6em; margin:0"><span class="highlight">예시</span>: 검색어가 ‘시험 일정’인데 문서 제목이 ‘중간고사 날짜 안내’일 때, 키워드 검색과 벡터검색을 같이 쓰면 더 잘 찾을 가능성이 큽니다.</p>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #111827 100%)">
+  <span class="badge badge-blue">08</span>
+  <h2><span class="grad-blue">검색 방식 비교</span></h2>
+  <p class="sm" style="margin-bottom:18px">세 방식은 서로 경쟁 관계라기보다, 장단점이 다른 도구라고 보면 됩니다</p>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:18%">방식</th>
+        <th style="width:30%">잘하는 것</th>
+        <th style="width:28%">약한 점</th>
+        <th>예시</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>키워드 검색</td>
+        <td>정확한 단어, 고유명사, 코드, 숫자 찾기</td>
+        <td>단어 표현이 달라지면 놓칠 수 있음</td>
+        <td>"도서관 운영시간"</td>
+      </tr>
+      <tr>
+        <td>벡터검색</td>
+        <td>비슷한 뜻, 자연스러운 문장 질문 찾기</td>
+        <td>정확한 용어·약어·숫자에는 약할 수 있음</td>
+        <td>"시험 일정" → "중간고사 날짜 안내"</td>
+      </tr>
+      <tr>
+        <td>하이브리드 검색</td>
+        <td>정확한 단어 + 비슷한 뜻 둘 다 챙김</td>
+        <td>설정이 조금 더 복잡함</td>
+        <td>학교 공지처럼 표현이 제각각일 때 유리</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #102033 100%)">
+  <span class="badge badge-cyan badge-blue">09</span>
+  <h2><span class="grad-cyan">왜 하이브리드 검색이 강할까?</span></h2>
+  <div class="grid-2">
+    <div class="glass">
+      <h3 style="font-size:0.84em; color:#fff">질문 예시</h3>
+      <p style="font-size:0.58em; color:#e2e8f0; margin:0 0 10px 0">질문: <span class="highlight">"시험 일정 알려줘"</span></p>
+      <ul style="font-size:0.57em">
+        <li>키워드 검색: "시험 일정표" 같은 정확한 단어를 잘 찾음</li>
+        <li>벡터검색: "중간고사 날짜 안내"처럼 뜻이 비슷한 문서를 잘 찾음</li>
+        <li>하이브리드: 둘 다 참고해서 더 관련 높은 문서를 고름</li>
+      </ul>
+    </div>
+    <div class="glass">
+      <h3 style="font-size:0.84em; color:#fff">그래서 좋은 점</h3>
+      <ul style="font-size:0.57em">
+        <li>정확한 공지 제목을 놓치지 않을 수 있음</li>
+        <li>표현이 달라도 관련 문서를 찾을 수 있음</li>
+        <li>실제 학교 자료처럼 표현이 섞여 있을 때 더 안정적임</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #102033 100%)">
+  <span class="badge badge-pink">10</span>
+  <h2><span class="grad-pink">RAG는 어떻게 동작할까?</span></h2>
+  <div class="grid-4">
+    <div class="mini-card">
+      <div class="step-num" style="background:rgba(37,99,235,0.3); color:#93c5fd">1</div>
+      <h3 style="font-size:0.8em; color:#fff">질문 받기</h3>
+      <p style="font-size:0.55em; color:#94a3b8">사용자가 질문을 입력함</p>
+    </div>
+    <div class="mini-card">
+      <div class="step-num" style="background:rgba(6,182,212,0.3); color:#67e8f9">2</div>
+      <h3 style="font-size:0.8em; color:#fff">관련 문서 찾기</h3>
+      <p style="font-size:0.55em; color:#94a3b8">벡터검색이나 키워드검색으로 자료 탐색</p>
+    </div>
+    <div class="mini-card">
+      <div class="step-num" style="background:rgba(16,185,129,0.3); color:#6ee7b7">3</div>
+      <h3 style="font-size:0.8em; color:#fff">찾은 문서 읽기</h3>
+      <p style="font-size:0.55em; color:#94a3b8">질문과 관련된 부분만 가져옴</p>
+    </div>
+    <div class="mini-card">
+      <div class="step-num" style="background:rgba(139,92,246,0.3); color:#c4b5fd">4</div>
+      <h3 style="font-size:0.8em; color:#fff">문서 기반 답변</h3>
+      <p style="font-size:0.55em; color:#94a3b8">찾은 내용을 바탕으로 답함</p>
+    </div>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #111827 100%)">
+  <span class="badge badge-red">11</span>
+  <h2><span class="grad-red">RAG 예시</span></h2>
+  <p class="sm" style="margin-bottom:18px">같은 질문이라도, 자료를 찾느냐 안 찾느냐에 따라 다르게 보일 수 있습니다</p>
+  <div class="grid-2">
+    <div class="compare-box compare-left">
+      <h3 style="font-size:0.82em; color:#fff">그냥 LLM만 쓸 때</h3>
+      <p style="font-size:0.56em; color:#e2e8f0; margin:0 0 10px 0">질문: “학교 도서관은 방과 후 몇 시까지 운영돼?”</p>
+      <ul style="font-size:0.56em; color:#94a3b8">
+        <li>학교 자료를 직접 찾지 않음</li>
+        <li>“보통 6시쯤일 거예요”처럼 추측할 수 있음</li>
+        <li>틀려도 왜 틀렸는지 알기 어려움</li>
+      </ul>
+    </div>
+    <div class="compare-box compare-right">
+      <h3 style="font-size:0.82em; color:#fff">RAG를 쓸 때</h3>
+      <p style="font-size:0.56em; color:#e2e8f0; margin:0 0 10px 0">질문: “학교 도서관은 방과 후 몇 시까지 운영돼?”</p>
+      <ul style="font-size:0.56em; color:#94a3b8">
+        <li>학교 안내문에서 운영시간 부분을 찾음</li>
+        <li>예: “평일 18:30까지 운영”</li>
+        <li>답변에 근거를 붙일 수 있음</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #0f1a2e 100%)">
+  <span class="badge badge-purple">12</span>
+  <h2><span class="grad-pink">학생 발표에서 RAG를 볼 때</span></h2>
+  <div class="grid-2">
+    <div class="glass">
+      <h3 style="font-size:0.84em; color:#fff">꼭 들어야 할 것</h3>
+      <ul style="font-size:0.57em">
+        <li>키워드 검색, 벡터검색, 하이브리드 검색 중 무엇을 비교하는가</li>
+        <li>어떤 답을 <span class="highlight">정확한 답</span>이라고 볼 것인가</li>
+        <li>답뿐 아니라 <span class="highlight">근거 문서</span>도 잘 찾는지 볼 것인가</li>
+      </ul>
+    </div>
+    <div class="glass">
+      <h3 style="font-size:0.84em; color:#fff">질문 예시</h3>
+      <ul style="font-size:0.57em">
+        <li>벡터검색을 쓰면 뭐가 더 좋아지나요?</li>
+        <li>정확도는 어떤 방식으로 비교하나요?</li>
+        <li>문서를 잘못 찾으면 답도 같이 틀어지지 않나요?</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #102033 100%)">
+  <span class="badge badge-green">13</span>
+  <h2><span class="grad-green">나머지 주제는 이렇게 짧게 연결</span></h2>
+  <div class="grid-2">
+    <div class="topic-card">
+      <h4>CNN</h4>
+      <p>컴퓨터가 숫자 사진을 보고 맞히는 방법 — 구조를 바꾸면 정확도와 속도가 달라질 수 있음</p>
+    </div>
+    <div class="topic-card">
+      <h4>랜덤과 확률</h4>
+      <p>랜덤은 많이 반복했을 때 확률에 가까워짐 — 그래프로 보면 더 잘 보임</p>
+    </div>
+    <div class="topic-card">
+      <h4>MITM과 암호화</h4>
+      <p>중간에서 정보를 훔쳐보는 공격 — 암호화는 그 위험을 줄이는 대표 방법</p>
+    </div>
+    <div class="topic-card">
+      <h4>로드밸런싱</h4>
+      <p>서버 일을 여러 서버에 나누는 것 — 더 빠르고 덜 멈추게 도와줄 수 있음</p>
+    </div>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #111827 100%)">
+  <span class="badge badge-green">14</span>
+  <h2><span class="grad-green">학생 발표를 들을 때 볼 것</span></h2>
+  <p class="sm" style="margin-bottom:20px">설명을 잘했는지만 보지 말고, 아래 네 가지를 같이 보면 좋습니다</p>
+  <div class="grid-4">
+    <div class="mini-card">
+      <div class="icon-circle" style="background:rgba(37,99,235,0.22)">❓</div>
+      <h3 style="font-size:0.78em; color:#fff">질문</h3>
+      <p style="font-size:0.54em; color:#94a3b8">무엇이 궁금한지 한 문장으로 말했는가</p>
+    </div>
+    <div class="mini-card">
+      <div class="icon-circle" style="background:rgba(6,182,212,0.22)">⚖️</div>
+      <h3 style="font-size:0.78em; color:#fff">비교</h3>
+      <p style="font-size:0.54em; color:#94a3b8">무엇과 무엇을 비교하는지 분명한가</p>
+    </div>
+    <div class="mini-card">
+      <div class="icon-circle" style="background:rgba(16,185,129,0.22)">📏</div>
+      <h3 style="font-size:0.78em; color:#fff">기준</h3>
+      <p style="font-size:0.54em; color:#94a3b8">어떤 결과가 더 좋은지 판단 기준이 있는가</p>
+    </div>
+    <div class="mini-card">
+      <div class="icon-circle" style="background:rgba(139,92,246,0.22)">🧭</div>
+      <h3 style="font-size:0.78em; color:#fff">다음 단계</h3>
+      <p style="font-size:0.54em; color:#94a3b8">3주차 전까지 실제로 뭘 할지 보이는가</p>
+    </div>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a1628 0%, #3a1c0f 50%, #0a1628 100%)">
+  <div class="divider-slide">
+    <div class="icon">🎤</div>
+    <span class="badge badge-orange" style="font-size:0.5em">Part 2</span>
+    <h2><span class="grad-orange">학생 발표</span></h2>
+    <p class="sm">1인당 8분 발표 + 4분 질문 / 학생 5명</p>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #0f1a2e 100%)">
+  <span class="badge badge-orange">15</span>
+  <h2><span class="grad-orange">발표 운영 & 체크 포인트</span></h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:14%">학생</th>
+        <th style="width:34%">주제</th>
+        <th style="width:23%">꼭 볼 것</th>
+        <th>질문 예시</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>박찬유</td>
+        <td>하이브리드 검색 기반 RAG</td>
+        <td>검색 방식, 정확도 기준</td>
+        <td>벡터검색을 쓰면 뭐가 더 좋아지나요?</td>
+      </tr>
+      <tr>
+        <td>전하율</td>
+        <td>CNN 손글씨 숫자 인식</td>
+        <td>구조 차이, 정확도/시간</td>
+        <td>몇 가지 구조를 비교할 건가요?</td>
+      </tr>
+      <tr>
+        <td>정윤호</td>
+        <td>게임에서 공정한 랜덤</td>
+        <td>시행 횟수, 공정성 기준</td>
+        <td>어떤 수치가 나오면 공정하다고 볼 건가요?</td>
+      </tr>
+      <tr>
+        <td>박시우</td>
+        <td>MITM 공격과 암호화</td>
+        <td>공격 흐름, 암호화 차이</td>
+        <td>암호화가 정확히 뭘 막아 주나요?</td>
+      </tr>
+      <tr>
+        <td>황재민</td>
+        <td>로드밸런싱과 서버 과부하</td>
+        <td>방식 비교, 성능 지표</td>
+        <td>응답시간 말고 또 무엇을 볼 건가요?</td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="xs" style="margin-top:16px">권장 시간: <span class="highlight">발표 8분 + 질문 4분</span> × 5명 = 60분</p>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #102033 100%)">
+  <span class="badge badge-pink">16</span>
+  <h2><span class="grad-pink">3주차 과제</span></h2>
+  <p class="sm" style="margin-bottom:20px">2차시 발표 후, 3주차 전까지 아래 4가지를 준비합니다</p>
+  <div class="grid-2">
+    <div class="glass glass-sm">
+      <div class="step-num" style="background:rgba(37,99,235,0.3); color:#93c5fd">1</div>
+      <h3 style="font-size:0.8em; color:#fff">탐구 질문 다시 쓰기</h3>
+      <p style="font-size:0.54em; color:#94a3b8">무엇을 비교할지 한 문장으로 더 분명하게 정리</p>
+    </div>
+    <div class="glass glass-sm">
+      <div class="step-num" style="background:rgba(6,182,212,0.3); color:#67e8f9">2</div>
+      <h3 style="font-size:0.8em; color:#fff">비교 계획 표 만들기</h3>
+      <p style="font-size:0.54em; color:#94a3b8">비교 대상 / 기준 / 방법을 표 1개로 정리</p>
+    </div>
+    <div class="glass glass-sm">
+      <div class="step-num" style="background:rgba(16,185,129,0.3); color:#6ee7b7">3</div>
+      <h3 style="font-size:0.8em; color:#fff">작은 실행 1번 해보기</h3>
+      <p style="font-size:0.54em; color:#94a3b8">코드 실행, 시뮬레이션, 자료 조사 중 하나 시작</p>
+    </div>
+    <div class="glass glass-sm">
+      <div class="step-num" style="background:rgba(139,92,246,0.3); color:#c4b5fd">4</div>
+      <h3 style="font-size:0.8em; color:#fff">결과 1장 정리</h3>
+      <p style="font-size:0.54em; color:#94a3b8">표, 그래프, 화면 캡처 중 하나로 현재 진행상황 보여주기</p>
+    </div>
+  </div>
+  <div class="glass" style="margin-top:18px; text-align:left">
+    <p style="font-size:0.6em; margin:0"><span class="highlight">형식</span>: 문서 / PPT / 노션 / 코랩 자유 · <span class="highlight">핵심</span>: “조사만 했다”가 아니라 실제로 한 단계 실행해 보기</p>
+  </div>
+</section>
+
+<section data-background-gradient="linear-gradient(135deg, #0a0f1a 0%, #1a1040 100%)">
+  <h2><span class="grad-cyan">오늘 기억할 것</span></h2>
+  <div style="display:flex; justify-content:center; margin-top:28px">
+    <div class="glass" style="max-width:760px; text-align:center">
+      <p style="font-size:0.7em; color:#fbbf24; font-weight:500; margin-bottom:12px">핵심 3문장</p>
+      <p style="font-size:0.63em; color:#e2e8f0; line-height:2">
+        RAG는 <span class="highlight">먼저 자료를 찾고</span>, 그 자료를 바탕으로 답하는 방식입니다.<br>
+        벡터검색은 <span class="highlight">비슷한 뜻</span>을 찾는 데 강하고, 하이브리드 검색은 <span class="highlight">키워드 + 의미 검색</span>을 함께 씁니다.<br>
+        학생 발표에서는 <span class="highlight">무엇을 비교하고 어떤 기준으로 판단할지</span>를 중심으로 들으면 됩니다.
+      </p>
+    </div>
+  </div>
+  <p class="sm" style="margin-top:28px">이제 학생 발표를 시작합니다 🎤</p>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script>
+Reveal.initialize({
+  hash: true,
+  slideNumber: 'c/t',
+  width: 1280,
+  height: 720,
+  margin: 0.08,
+  transition: 'slide',
+  transitionSpeed: 'default',
+  backgroundTransition: 'fade',
+  center: true,
+});
+</script>
+</body>
+</html>
