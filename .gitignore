@@ -101,3 +101,8 @@ pptxgenjs-editable-template/
 *.skill
 projects/
 reviews/
+
+# =========================================
+# Class materials (local-only, do not publish)
+# =========================================
+대산고_*
