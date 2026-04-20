@@ -41,6 +41,14 @@ function pill(text) {
   return `<span class="pill">${text}</span>`;
 }
 
+async function loadConfig() {
+  const data = await getJson('/api/config');
+  const current = data.settings?.agent2_model || 'gpt-5.4';
+  agent2ModelSelect.innerHTML = data.openai_models.map((name) => `<option value="${name}">${name}</option>`).join('');
+  agent2ModelSelect.value = current;
+  configHint.textContent = `Current Agent 2: ${current} · applies to new iterations`;
+}
+
 async function refreshOverview() {
   const data = await getJson('/api/overview');
   state.overview = data;
@@ -50,20 +58,12 @@ async function refreshOverview() {
   metricGrid.innerHTML = [
     metricCard('Loop Status', (s.status || 'idle').toUpperCase(), s.note || ''),
     metricCard('Iteration', s.iteration ?? 0, 'completed rounds'),
-    metricCard('Candidates', data.stats.total_candidates, 'generated total'),
+    metricCard('Candidates', data.stats.total_candidates, 'generated interpreters'),
     metricCard('Archived', data.stats.archived_candidates, 'hard-but-valid languages'),
     metricCard('Agent 2 Model', settings.agent2_model || 'gpt-5.4', 'current OpenAI solver'),
     metricCard('Current Hardest', hardest.name || '—', hardest.failure_rate != null ? `failure ${(hardest.failure_rate * 100).toFixed(0)}%` : 'not available'),
   ].join('');
   renderBenchmark();
-}
-
-async function loadConfig() {
-  const data = await getJson('/api/config');
-  const current = data.settings?.agent2_model || 'gpt-5.4';
-  agent2ModelSelect.innerHTML = data.openai_models.map((name) => `<option value="${name}">${name}</option>`).join('');
-  agent2ModelSelect.value = current;
-  configHint.textContent = `Current Agent 2: ${current} · applies to new iterations`;
 }
 
 function renderBenchmark() {
@@ -130,9 +130,8 @@ function candidateRow(c) {
         ${pill(`failure ${(c.failure_rate * 100).toFixed(0)}%`)}
         ${pill(`similarity ${(c.similarity_score * 100).toFixed(0)}%`)}
         ${pill(`conflict ${(c.conflict_score * 100).toFixed(0)}%`)}
-        ${pill(`solvable ${(c.solvable_score * 100).toFixed(0)}%`)}
+        ${pill(`solver ${meta.agent2_model || 'gpt-5.4'}`)}
         ${pill(archived)}
-        ${meta.python_near ? pill('python-near') : ''}
       </div>
     </div>
   `;
@@ -180,20 +179,20 @@ function renderOverviewTab(c) {
     <div class="workspace-section">
       <div class="overview-grid">
         <div class="detail-box">
-          <h3>${c.name}</h3>
-          <p>${c.mutation_summary}</p>
+          <h3>Pipeline</h3>
+          <p><strong>Agent A</strong> builds/mutates the interpreter.<br><strong>Agent B</strong> emits JSON AST programs.<br><strong>Validator</strong> executes via interpreter and compares outputs.</p>
         </div>
         <div class="detail-box">
-          <h3>Interpreter Hint</h3>
-          <p>${c.interpreter_hint}</p>
+          <h3>Current Candidate</h3>
+          <p>${c.name} · ${c.level}<br>${c.mutation_summary}</p>
         </div>
         <div class="detail-box">
-          <h3>Search Signals</h3>
-          <p>Similarity ${(c.similarity_score * 100).toFixed(0)}% · Conflict ${(c.conflict_score * 100).toFixed(0)}% · Solvable ${(c.solvable_score * 100).toFixed(0)}% · Novelty ${(c.novelty_score * 100).toFixed(0)}%</p>
+          <h3>Execution Signals</h3>
+          <p>Similarity ${(c.similarity_score * 100).toFixed(0)}% · Conflict ${(c.conflict_score * 100).toFixed(0)}% · Solvable ${(c.solvable_score * 100).toFixed(0)}% · Failure ${(c.failure_rate * 100).toFixed(0)}%</p>
         </div>
         <div class="detail-box">
-          <h3>Analyzer Output</h3>
-          <p>Status: ${c.status} · Archived: ${c.archived ? 'yes' : 'no'} · Hardest models: ${(meta.hardest_models || []).join(', ') || '—'}</p>
+          <h3>Runtime Settings</h3>
+          <p>Agent 2 model: ${meta.agent2_model || 'gpt-5.4'}<br>Submission: JSON AST<br>Validator: deterministic execution</p>
         </div>
       </div>
       <div class="detail-box">
@@ -204,47 +203,64 @@ function renderOverviewTab(c) {
   `;
 }
 
-function renderPromptsTab(c) {
+function renderAgentATab(c) {
   const files = c.artifacts?.files || {};
   return `
-    <div class="workspace-section two-col">
-      <div class="artifact-card"><h3>Agent 1 — NewPL Searcher</h3><pre class="code-block">${escapeHtml(files['prompts/agent1_newpl.txt'] || '')}</pre></div>
-      <div class="artifact-card"><h3>Agent 2 — Solver Bench</h3><pre class="code-block">${escapeHtml(files['prompts/agent2_solver.txt'] || '')}</pre></div>
-      <div class="artifact-card"><h3>Agent 3 — Analyzer / Curator</h3><pre class="code-block">${escapeHtml(files['prompts/agent3_curator.txt'] || '')}</pre></div>
+    <div class="workspace-section">
+      <div class="artifact-card"><h3>Agent A Prompt</h3><pre class="code-block compact">${escapeHtml(files['prompts/agentA_interpreter_builder.txt'] || '')}</pre></div>
+      <div class="two-col">
+        <div class="artifact-card"><h3>interpreter.ml</h3><pre class="code-block">${escapeHtml(files['interpreter.ml'] || '')}</pre></div>
+        <div class="artifact-card"><h3>language_spec.json</h3><pre class="code-block">${escapeHtml(files['language_spec.json'] || '')}</pre></div>
+      </div>
+      <div class="artifact-card"><h3>ast_schema.json</h3><pre class="code-block">${escapeHtml(files['ast_schema.json'] || '')}</pre></div>
     </div>
   `;
 }
 
-function renderArtifactsTab(c) {
+function renderAgentBTab(c) {
+  const files = c.artifacts?.files || {};
+  return `
+    <div class="workspace-section">
+      <div class="artifact-card"><h3>Agent B Prompt</h3><pre class="code-block compact">${escapeHtml(files['prompts/agentB_solver.txt'] || '')}</pre></div>
+      <div class="two-col">
+        <div class="artifact-card"><h3>tasks.json</h3><pre class="code-block">${escapeHtml(files['tasks.json'] || '')}</pre></div>
+        <div class="artifact-card"><h3>program_attempts.json</h3><pre class="code-block">${escapeHtml(files['program_attempts.json'] || '')}</pre></div>
+      </div>
+    </div>
+  `;
+}
+
+function renderValidatorTab(c) {
+  const files = c.artifacts?.files || {};
+  return `
+    <div class="workspace-section">
+      <div class="detail-box">
+        <h3>Validator Summary</h3>
+        <p>The validator checks JSON schema conformity, reconstructs AST, executes the interpreter, and compares outputs against expected task results.</p>
+      </div>
+      <div class="artifact-card"><h3>validator_result.json</h3><pre class="code-block">${escapeHtml(files['validator_result.json'] || '')}</pre></div>
+      <div class="detail-box">
+        <h3>Execution Matrix</h3>
+        ${renderEvalTable(c.evaluations || [])}
+      </div>
+    </div>
+  `;
+}
+
+function renderDataTab(c) {
   const files = c.artifacts?.files || {};
   const manifest = c.artifacts?.manifest || [];
   return `
     <div class="workspace-section">
       <div class="detail-box">
-        <h3>Artifact Manifest</h3>
+        <h3>Data Bundle Manifest</h3>
         <ul class="manifest-list">${manifest.map((m) => `<li>${m}</li>`).join('')}</ul>
       </div>
       <div class="two-col">
         <div class="artifact-card"><h3>spec.md</h3><pre class="code-block">${escapeHtml(files['spec.md'] || '')}</pre></div>
-        <div class="artifact-card"><h3>interpreter.py</h3><pre class="code-block">${escapeHtml(files['interpreter.py'] || '')}</pre></div>
+        <div class="artifact-card"><h3>analysis.json</h3><pre class="code-block">${escapeHtml(files['analysis.json'] || '')}</pre></div>
       </div>
-      <div class="artifact-card"><h3>tasks.json</h3><pre class="code-block">${escapeHtml(files['tasks.json'] || '')}</pre></div>
-    </div>
-  `;
-}
-
-function renderEvaluationsTab(c) {
-  const files = c.artifacts?.files || {};
-  return `
-    <div class="workspace-section">
-      <div class="detail-box">
-        <h3>Evaluation Matrix</h3>
-        ${renderEvalTable(c.evaluations || [])}
-      </div>
-      <div class="artifact-card">
-        <h3>analysis.json</h3>
-        <pre class="code-block compact">${escapeHtml(files['analysis.json'] || '')}</pre>
-      </div>
+      <div class="artifact-card"><h3>candidate.json</h3><pre class="code-block">${escapeHtml(files['candidate.json'] || '')}</pre></div>
     </div>
   `;
 }
@@ -261,9 +277,10 @@ function renderRawTab(c) {
 
 function renderWorkspaceTab(c) {
   switch (state.activeTab) {
-    case 'prompts': return renderPromptsTab(c);
-    case 'artifacts': return renderArtifactsTab(c);
-    case 'evaluations': return renderEvaluationsTab(c);
+    case 'agentA': return renderAgentATab(c);
+    case 'agentB': return renderAgentBTab(c);
+    case 'validator': return renderValidatorTab(c);
+    case 'data': return renderDataTab(c);
     case 'raw': return renderRawTab(c);
     case 'overview':
     default:
@@ -331,7 +348,7 @@ document.getElementById('resetBtn').addEventListener('click', async () => {
   await post('/api/loop/reset');
   state.selectedId = null;
   workspaceContent.className = 'workspace empty';
-  workspaceContent.textContent = 'Select a candidate to inspect prompts, generated files, and benchmark data.';
+  workspaceContent.textContent = 'Select a candidate to inspect interpreter, schema, program JSON, and validator outputs.';
   selectedHint.textContent = 'Select a candidate';
 });
 

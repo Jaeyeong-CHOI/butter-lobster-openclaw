@@ -1,24 +1,3 @@
-# PL-026 L2
-
-- **Candidate ID:** cand-e8ae563621
-- **Level:** L2
-- **Parent:** L3 InvertedIf Seed
-- **Status:** discarded
-- **Archived:** no
-
-## Mutation Summary
-Block syntax inversion
-
-## Interpreter Hint
-Function and block delimiters remain Python-near, but control-flow syntax is restructured.
-
-## Pipeline
-1. Agent A mutates or creates the interpreter.
-2. Agent B generates a JSON AST program for the task.
-3. The deterministic validator parses JSON, reconstructs AST, executes the interpreter, and compares outputs.
-
-## Structured Spec
-```json
 {
   "candidate_id": "cand-e8ae563621",
   "name": "PL-026 L2",
@@ -57,4 +36,3 @@ Function and block delimiters remain Python-near, but control-flow syntax is res
     "prior_boundary": true
   }
 }
-```

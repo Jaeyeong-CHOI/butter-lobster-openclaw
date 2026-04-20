@@ -1,0 +1,172 @@
+{
+  "candidate_id": "cand-e8ae563621",
+  "validator_mode": "json -> schema check -> AST reconstruction -> interpreter execution -> output comparison",
+  "summary": {
+    "total_evaluations": 16,
+    "total_success": 8,
+    "total_failure": 8,
+    "failure_rate": 0.5
+  },
+  "rows": [
+    {
+      "model_name": "gpt-5.4",
+      "task_name": "abs",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 1.0,
+      "notes": ""
+    },
+    {
+      "model_name": "gpt-5.4",
+      "task_name": "max",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 0.945,
+      "notes": ""
+    },
+    {
+      "model_name": "gpt-5.4",
+      "task_name": "fib",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.324,
+      "notes": "Fails on prior-entrenched task"
+    },
+    {
+      "model_name": "gpt-5.4",
+      "task_name": "gcd",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.385,
+      "notes": "Fails on prior-entrenched task"
+    },
+    {
+      "model_name": "gpt-5.4-mini",
+      "task_name": "abs",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 0.973,
+      "notes": ""
+    },
+    {
+      "model_name": "gpt-5.4-mini",
+      "task_name": "max",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 0.954,
+      "notes": ""
+    },
+    {
+      "model_name": "gpt-5.4-mini",
+      "task_name": "fib",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.42,
+      "notes": "Fails on prior-entrenched task"
+    },
+    {
+      "model_name": "gpt-5.4-mini",
+      "task_name": "gcd",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.366,
+      "notes": "Fails on prior-entrenched task"
+    },
+    {
+      "model_name": "o4-mini",
+      "task_name": "abs",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 1.0,
+      "notes": ""
+    },
+    {
+      "model_name": "o4-mini",
+      "task_name": "max",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 1.0,
+      "notes": ""
+    },
+    {
+      "model_name": "o4-mini",
+      "task_name": "fib",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.53,
+      "notes": "Fails on prior-entrenched task"
+    },
+    {
+      "model_name": "o4-mini",
+      "task_name": "gcd",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.633,
+      "notes": "Fails on prior-entrenched task"
+    },
+    {
+      "model_name": "qwen3-32b",
+      "task_name": "abs",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 0.894,
+      "notes": ""
+    },
+    {
+      "model_name": "qwen3-32b",
+      "task_name": "max",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 0.827,
+      "notes": ""
+    },
+    {
+      "model_name": "qwen3-32b",
+      "task_name": "fib",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.28,
+      "notes": "Fails on prior-entrenched task"
+    },
+    {
+      "model_name": "qwen3-32b",
+      "task_name": "gcd",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.405,
+      "notes": "Fails on prior-entrenched task"
+    }
+  ]
+}

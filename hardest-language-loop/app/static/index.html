@@ -10,7 +10,7 @@
     <header class="topbar">
       <div>
         <h1>Hardest Language Loop</h1>
-        <p class="subtitle">Monitor generated languages, agent prompts, artifacts, evaluations, and archive decisions in one place.</p>
+        <p class="subtitle">Monitor the full executable pipeline: Agent A builds the interpreter, Agent B emits JSON AST programs, and the validator executes them deterministically.</p>
       </div>
       <div class="controls">
         <label class="select-wrap">
@@ -29,7 +29,7 @@
       <section class="panel metrics">
         <div class="panel-head">
           <h2>Loop Overview</h2>
-          <span class="hint">Live system summary</span>
+          <span class="hint">System-level summary</span>
         </div>
         <div class="metric-grid" id="metricGrid"></div>
       </section>
@@ -48,23 +48,24 @@
 
       <section class="panel workspace-panel">
         <div class="panel-head">
-          <h2>Candidate Workspace</h2>
+          <h2>Execution Workspace</h2>
           <span id="selectedHint" class="hint">Select a candidate</span>
         </div>
         <div class="tabs">
-          <button class="tab active" data-tab="overview">Overview</button>
-          <button class="tab" data-tab="prompts">Agent Prompts</button>
-          <button class="tab" data-tab="artifacts">Artifacts</button>
-          <button class="tab" data-tab="evaluations">Evaluations</button>
+          <button class="tab active" data-tab="overview">Pipeline Overview</button>
+          <button class="tab" data-tab="agentA">Agent A / Interpreter</button>
+          <button class="tab" data-tab="agentB">Agent B / Program JSON</button>
+          <button class="tab" data-tab="validator">Validator</button>
+          <button class="tab" data-tab="data">Data Bundle</button>
           <button class="tab" data-tab="raw">Raw JSON</button>
         </div>
-        <div id="workspaceContent" class="workspace empty">Select a candidate to inspect prompts, generated files, and benchmark data.</div>
+        <div id="workspaceContent" class="workspace empty">Select a candidate to inspect interpreter, schema, program JSON, and validator outputs.</div>
       </section>
 
       <section class="panel benchmark-panel">
         <div class="panel-head">
           <h2>Benchmark Monitor</h2>
-          <span class="hint">Model / task pass-rate summary</span>
+          <span class="hint">Execution outcomes by model, task, and level</span>
         </div>
         <div id="benchmarkContent" class="benchmark-grid"></div>
       </section>
