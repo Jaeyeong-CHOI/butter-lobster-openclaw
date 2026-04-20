@@ -11,12 +11,13 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import store
+from .artifacts import load_candidate_bundle, materialize_candidate_bundle
 from .engine import AgentLoopService
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 
-app = FastAPI(title="Hardest Language Loop", version="0.1.0")
+app = FastAPI(title="Hardest Language Loop", version="0.2.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -54,6 +55,22 @@ async def api_candidate(candidate_id: str) -> JSONResponse:
     item = store.get_candidate(candidate_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Candidate not found")
+    parent_name = None
+    if item.get("parent_id"):
+        parent = store.get_candidate(item["parent_id"])
+        parent_name = parent.get("name") if parent else None
+    materialize_candidate_bundle(
+        item,
+        parent_name=parent_name,
+        evaluations=item.get("evaluations", []),
+        analysis={
+            "status": item.get("status"),
+            "archived": item.get("archived"),
+            "failure_rate": item.get("failure_rate"),
+            "metadata": item.get("metadata", {}),
+        },
+    )
+    item["artifacts"] = load_candidate_bundle(item)
     return JSONResponse(item)
 
 

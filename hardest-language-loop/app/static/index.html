@@ -10,7 +10,7 @@
     <header class="topbar">
       <div>
         <h1>Hardest Language Loop</h1>
-        <p class="subtitle">Web monitor for Agent 1 (NewPL), Agent 2 (Solver Bench), Agent 3 (Analyzer/Curator)</p>
+        <p class="subtitle">Monitor generated languages, agent prompts, artifacts, evaluations, and archive decisions in one place.</p>
       </div>
       <div class="controls">
         <button id="startBtn">Start Loop</button>
@@ -24,8 +24,44 @@
       <section class="panel metrics">
         <div class="panel-head">
           <h2>Loop Overview</h2>
+          <span class="hint">Live system summary</span>
         </div>
         <div class="metric-grid" id="metricGrid"></div>
+      </section>
+
+      <section class="panel explorer-panel">
+        <div class="panel-head">
+          <h2>Candidate Explorer</h2>
+          <span class="hint">Search / filter / inspect</span>
+        </div>
+        <div class="toolbar">
+          <input id="searchInput" class="search" placeholder="Search candidates, level, mutation…" />
+          <label class="checkbox"><input type="checkbox" id="archivedOnly" /> archived only</label>
+        </div>
+        <div id="candidateList" class="candidate-list"></div>
+      </section>
+
+      <section class="panel workspace-panel">
+        <div class="panel-head">
+          <h2>Candidate Workspace</h2>
+          <span id="selectedHint" class="hint">Select a candidate</span>
+        </div>
+        <div class="tabs">
+          <button class="tab active" data-tab="overview">Overview</button>
+          <button class="tab" data-tab="prompts">Agent Prompts</button>
+          <button class="tab" data-tab="artifacts">Artifacts</button>
+          <button class="tab" data-tab="evaluations">Evaluations</button>
+          <button class="tab" data-tab="raw">Raw JSON</button>
+        </div>
+        <div id="workspaceContent" class="workspace empty">Select a candidate to inspect prompts, generated files, and benchmark data.</div>
+      </section>
+
+      <section class="panel benchmark-panel">
+        <div class="panel-head">
+          <h2>Benchmark Monitor</h2>
+          <span class="hint">Model / task pass-rate summary</span>
+        </div>
+        <div id="benchmarkContent" class="benchmark-grid"></div>
       </section>
 
       <section class="panel log-panel">
@@ -34,21 +70,6 @@
           <span id="eventStatus" class="badge">connecting…</span>
         </div>
         <div id="eventList" class="event-list"></div>
-      </section>
-
-      <section class="panel candidates-panel">
-        <div class="panel-head">
-          <h2>Candidates</h2>
-          <span class="hint">Click a candidate for details</span>
-        </div>
-        <div id="candidateList" class="candidate-list"></div>
-      </section>
-
-      <section class="panel detail-panel">
-        <div class="panel-head">
-          <h2>Candidate Detail</h2>
-        </div>
-        <div id="candidateDetail" class="candidate-detail empty">Select a candidate to inspect its evaluation matrix.</div>
       </section>
     </main>
 

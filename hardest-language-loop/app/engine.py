@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from . import store
+from .artifacts import materialize_candidate_bundle
 
 MODELS = [
     {"name": "gpt-5.4", "skill": 0.82, "prior_strength": 0.92},
@@ -89,6 +90,7 @@ class AgentLoopService:
                     "parent_id": None,
                     "created_at": now_iso(),
                 }
+                materialize_candidate_bundle(candidate, parent_name=None, evaluations=[], analysis={"bootstrap": True})
                 store.insert_candidate(candidate)
             store.insert_event("bootstrap", {"message": "Seed languages inserted"}, now_iso())
 
@@ -166,6 +168,7 @@ class AgentLoopService:
                 "prompt_mode_default": "interpreter_as_spec",
                 "agent1_parent": parent.get("name") if parent else "None",
                 "python_near": similarity > 0.72,
+                "task_bank": [t["name"] for t in TASKS],
             },
             "created_at": now_iso(),
         }
@@ -233,6 +236,7 @@ class AgentLoopService:
         iteration = int(state.get("iteration", 0)) + 1
         parent = self._choose_parent()
         candidate = self._generate_candidate(iteration, parent)
+        materialize_candidate_bundle(candidate, parent_name=parent.get("name") if parent else None, evaluations=[], analysis={"stage": "generated"})
         store.insert_candidate(candidate)
         store.set_loop_state(
             status="running" if self._running else "idle",
@@ -256,6 +260,12 @@ class AgentLoopService:
         for row in evaluations:
             store.insert_evaluation(row)
         analysis = self._analyze(candidate, evaluations)
+        materialize_candidate_bundle(
+            candidate,
+            parent_name=parent.get("name") if parent else None,
+            evaluations=evaluations,
+            analysis=analysis,
+        )
         store.update_candidate_outcome(
             candidate["id"],
             failure_rate=analysis["failure_rate"],

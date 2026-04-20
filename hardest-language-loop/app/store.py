@@ -194,6 +194,32 @@ def list_events(after_id: int = 0, limit: int = 100) -> list[dict[str, Any]]:
         return [{**row_to_dict(r), "payload": json.loads(r["payload_json"])} for r in rows]
 
 
+def _benchmark_summary(conn: sqlite3.Connection) -> dict[str, Any]:
+    model_rows = conn.execute(
+        """
+        SELECT model_name, COUNT(*) AS n, AVG(success) AS pass_rate
+        FROM evaluations GROUP BY model_name ORDER BY pass_rate ASC, model_name ASC
+        """
+    ).fetchall()
+    task_rows = conn.execute(
+        """
+        SELECT task_name, COUNT(*) AS n, AVG(success) AS pass_rate
+        FROM evaluations GROUP BY task_name ORDER BY pass_rate ASC, task_name ASC
+        """
+    ).fetchall()
+    level_rows = conn.execute(
+        """
+        SELECT level, COUNT(*) AS n, AVG(failure_rate) AS avg_failure, SUM(CASE WHEN archived = 1 THEN 1 ELSE 0 END) AS archived_n
+        FROM candidates GROUP BY level ORDER BY avg_failure DESC
+        """
+    ).fetchall()
+    return {
+        "models": [row_to_dict(r) for r in model_rows],
+        "tasks": [row_to_dict(r) for r in task_rows],
+        "levels": [row_to_dict(r) for r in level_rows],
+    }
+
+
 def get_overview() -> dict[str, Any]:
     with get_conn() as conn:
         state = row_to_dict(conn.execute("SELECT * FROM loop_state WHERE id = 1").fetchone()) or {}
@@ -214,6 +240,7 @@ def get_overview() -> dict[str, Any]:
                 "total_evaluations": total_evaluations,
             },
             "hardest": row_to_dict(hardest),
+            "benchmark": _benchmark_summary(conn),
         }
 
 
