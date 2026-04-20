@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hardest Language Loop</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>Hardest Language Loop</h1>
+        <p class="subtitle">Web monitor for Agent 1 (NewPL), Agent 2 (Solver Bench), Agent 3 (Analyzer/Curator)</p>
+      </div>
+      <div class="controls">
+        <button id="startBtn">Start Loop</button>
+        <button id="pauseBtn" class="secondary">Pause</button>
+        <button id="stepBtn" class="secondary">Single Step</button>
+        <button id="resetBtn" class="danger">Reset</button>
+      </div>
+    </header>
+
+    <main class="grid">
+      <section class="panel metrics">
+        <div class="panel-head">
+          <h2>Loop Overview</h2>
+        </div>
+        <div class="metric-grid" id="metricGrid"></div>
+      </section>
+
+      <section class="panel log-panel">
+        <div class="panel-head">
+          <h2>Live Event Stream</h2>
+          <span id="eventStatus" class="badge">connecting…</span>
+        </div>
+        <div id="eventList" class="event-list"></div>
+      </section>
+
+      <section class="panel candidates-panel">
+        <div class="panel-head">
+          <h2>Candidates</h2>
+          <span class="hint">Click a candidate for details</span>
+        </div>
+        <div id="candidateList" class="candidate-list"></div>
+      </section>
+
+      <section class="panel detail-panel">
+        <div class="panel-head">
+          <h2>Candidate Detail</h2>
+        </div>
+        <div id="candidateDetail" class="candidate-detail empty">Select a candidate to inspect its evaluation matrix.</div>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
