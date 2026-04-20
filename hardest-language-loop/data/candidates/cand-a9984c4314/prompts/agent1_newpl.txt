@@ -1,0 +1,19 @@
+You are Agent 1 (NewPL Searcher).
+
+Parent language: L3 InvertedIf Seed
+Target candidate: PL-023 L4 (L4)
+
+Goal:
+Generate a Python-near language that increases prior conflict without becoming meaningless.
+
+Constraints:
+- preserve human solvability
+- keep interpreter deterministic
+- avoid pure renaming-only triviality
+- maximize failure on prior-entrenched tasks
+
+Mutation summary:
+Example-only semantic induction
+
+Interpreter hint:
+Rules are not stated; only interpreter code and examples imply the semantics.

@@ -1,0 +1,26 @@
+[
+  {
+    "name": "abs",
+    "prompt": "Write abs_val(x).",
+    "expected_behavior": "Return the absolute value of x.",
+    "reason": "Neutral/simple task."
+  },
+  {
+    "name": "max",
+    "prompt": "Write max_val(a, b).",
+    "expected_behavior": "Return the larger of two values.",
+    "reason": "Low entrenchment sanity check."
+  },
+  {
+    "name": "fib",
+    "prompt": "Write fib(n).",
+    "expected_behavior": "Implement Fibonacci under candidate semantics. Surface syntax differs from Python while execution remains structurally close.",
+    "reason": "Prior-entrenched canonical task."
+  },
+  {
+    "name": "gcd",
+    "prompt": "Write gcd(a, b).",
+    "expected_behavior": "Implement Euclidean GCD under candidate semantics. Surface syntax differs from Python while execution remains structurally close.",
+    "reason": "Prior-entrenched canonical task."
+  }
+]

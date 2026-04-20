@@ -1,7 +1,5 @@
 You are Agent 2 (Solver Bench).
 
-Selected OpenAI model: gpt-5.4
-
 This code defines our programming language.
 [interpreter.py]
 
@@ -12,4 +10,4 @@ Solve the following tasks in this language:
 - gcd
 
 Default prompt mode: interpreter_as_spec
-Candidate: PL-026 L2
+Candidate: PL-022 L3

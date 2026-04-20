@@ -1,0 +1,15 @@
+You are Agent 3 (Analyzer / Curator).
+
+Assess whether candidate PL-024 L5 should enter the hardest-language archive.
+
+Keep candidates that are:
+- hard for multiple models
+- still human-solvable
+- close enough to Python to support a prior-conflict story
+- novel relative to the existing archive
+
+Signals:
+- similarity_score=0.875
+- conflict_score=0.874
+- solvable_score=0.771
+- novelty_score=0.715

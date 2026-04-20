@@ -17,6 +17,8 @@ const benchmarkContent = document.getElementById('benchmarkContent');
 const selectedHint = document.getElementById('selectedHint');
 const searchInput = document.getElementById('searchInput');
 const archivedOnlyInput = document.getElementById('archivedOnly');
+const agent2ModelSelect = document.getElementById('agent2ModelSelect');
+const configHint = document.getElementById('configHint');
 
 async function getJson(url, options = {}) {
   const res = await fetch(url, options);
@@ -44,14 +46,24 @@ async function refreshOverview() {
   state.overview = data;
   const s = data.state || {};
   const hardest = data.hardest || {};
+  const settings = data.settings || {};
   metricGrid.innerHTML = [
     metricCard('Loop Status', (s.status || 'idle').toUpperCase(), s.note || ''),
     metricCard('Iteration', s.iteration ?? 0, 'completed rounds'),
     metricCard('Candidates', data.stats.total_candidates, 'generated total'),
     metricCard('Archived', data.stats.archived_candidates, 'hard-but-valid languages'),
+    metricCard('Agent 2 Model', settings.agent2_model || 'gpt-5.4', 'current OpenAI solver'),
     metricCard('Current Hardest', hardest.name || '—', hardest.failure_rate != null ? `failure ${(hardest.failure_rate * 100).toFixed(0)}%` : 'not available'),
   ].join('');
   renderBenchmark();
+}
+
+async function loadConfig() {
+  const data = await getJson('/api/config');
+  const current = data.settings?.agent2_model || 'gpt-5.4';
+  agent2ModelSelect.innerHTML = data.openai_models.map((name) => `<option value="${name}">${name}</option>`).join('');
+  agent2ModelSelect.value = current;
+  configHint.textContent = `Current Agent 2: ${current} · applies to new iterations`;
 }
 
 function renderBenchmark() {
@@ -300,6 +312,18 @@ async function post(url) {
   if (state.selectedId) await selectCandidate(state.selectedId);
 }
 
+async function updateConfig(payload) {
+  const data = await getJson('/api/config', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const current = data.settings?.agent2_model || 'gpt-5.4';
+  configHint.textContent = `Current Agent 2: ${current} · reset loop for a clean benchmark history`;
+  await refreshOverview();
+  if (state.selectedId) await selectCandidate(state.selectedId);
+}
+
 document.getElementById('startBtn').addEventListener('click', () => post('/api/loop/start'));
 document.getElementById('pauseBtn').addEventListener('click', () => post('/api/loop/pause'));
 document.getElementById('stepBtn').addEventListener('click', () => post('/api/loop/step'));
@@ -318,6 +342,9 @@ searchInput.addEventListener('input', async (e) => {
 archivedOnlyInput.addEventListener('change', async (e) => {
   state.archivedOnly = e.target.checked;
   await refreshCandidates();
+});
+agent2ModelSelect.addEventListener('change', async (e) => {
+  await updateConfig({ agent2_model: e.target.value });
 });
 
 document.querySelectorAll('.tab').forEach((tab) => {
@@ -345,6 +372,7 @@ function connectEvents() {
 }
 
 async function init() {
+  await loadConfig();
   await refreshOverview();
   await preloadEvents();
   await refreshCandidates();

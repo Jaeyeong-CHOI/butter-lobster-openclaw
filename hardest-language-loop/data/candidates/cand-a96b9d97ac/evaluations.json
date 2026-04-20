@@ -1,0 +1,178 @@
+[
+  {
+    "id": "eval-105f1041fc1f",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "gpt-5.4",
+    "task_name": "abs",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 1,
+    "score": 1.0,
+    "notes": "",
+    "created_at": "2026-04-20T00:33:22.419759+00:00"
+  },
+  {
+    "id": "eval-c4b3c7b1c19b",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "gpt-5.4",
+    "task_name": "max",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 1,
+    "score": 0.891,
+    "notes": "",
+    "created_at": "2026-04-20T00:33:22.419813+00:00"
+  },
+  {
+    "id": "eval-670c79495244",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "gpt-5.4",
+    "task_name": "fib",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 0,
+    "score": 0.263,
+    "notes": "Fails on prior-entrenched task",
+    "created_at": "2026-04-20T00:33:22.419835+00:00"
+  },
+  {
+    "id": "eval-945d0d388d95",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "gpt-5.4",
+    "task_name": "gcd",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 0,
+    "score": 0.412,
+    "notes": "Fails on prior-entrenched task",
+    "created_at": "2026-04-20T00:33:22.419855+00:00"
+  },
+  {
+    "id": "eval-acbf76fc02d3",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "gpt-5.4-mini",
+    "task_name": "abs",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 1,
+    "score": 0.91,
+    "notes": "",
+    "created_at": "2026-04-20T00:33:22.419875+00:00"
+  },
+  {
+    "id": "eval-0ae979d74174",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "gpt-5.4-mini",
+    "task_name": "max",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 1,
+    "score": 0.873,
+    "notes": "",
+    "created_at": "2026-04-20T00:33:22.419893+00:00"
+  },
+  {
+    "id": "eval-6e23f09dd74e",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "gpt-5.4-mini",
+    "task_name": "fib",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 0,
+    "score": 0.325,
+    "notes": "Fails on prior-entrenched task",
+    "created_at": "2026-04-20T00:33:22.419909+00:00"
+  },
+  {
+    "id": "eval-07142a953235",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "gpt-5.4-mini",
+    "task_name": "gcd",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 0,
+    "score": 0.45,
+    "notes": "Fails on prior-entrenched task",
+    "created_at": "2026-04-20T00:33:22.419925+00:00"
+  },
+  {
+    "id": "eval-955bade45552",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "o4-mini",
+    "task_name": "abs",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 1,
+    "score": 1.0,
+    "notes": "",
+    "created_at": "2026-04-20T00:33:22.419942+00:00"
+  },
+  {
+    "id": "eval-ff475c9d2417",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "o4-mini",
+    "task_name": "max",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 1,
+    "score": 0.944,
+    "notes": "",
+    "created_at": "2026-04-20T00:33:22.419959+00:00"
+  },
+  {
+    "id": "eval-dbf359e4038d",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "o4-mini",
+    "task_name": "fib",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 0,
+    "score": 0.615,
+    "notes": "Fails on prior-entrenched task",
+    "created_at": "2026-04-20T00:33:22.419977+00:00"
+  },
+  {
+    "id": "eval-5bbcaadcf36d",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "o4-mini",
+    "task_name": "gcd",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 0,
+    "score": 0.648,
+    "notes": "Fails on prior-entrenched task",
+    "created_at": "2026-04-20T00:33:22.419993+00:00"
+  },
+  {
+    "id": "eval-89b9a09e17c3",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "qwen3-32b",
+    "task_name": "abs",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 1,
+    "score": 0.802,
+    "notes": "",
+    "created_at": "2026-04-20T00:33:22.420010+00:00"
+  },
+  {
+    "id": "eval-738733a2f21b",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "qwen3-32b",
+    "task_name": "max",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 1,
+    "score": 0.753,
+    "notes": "",
+    "created_at": "2026-04-20T00:33:22.420026+00:00"
+  },
+  {
+    "id": "eval-f94669fd2268",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "qwen3-32b",
+    "task_name": "fib",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 0,
+    "score": 0.331,
+    "notes": "Fails on prior-entrenched task",
+    "created_at": "2026-04-20T00:33:22.420042+00:00"
+  },
+  {
+    "id": "eval-b9dd01b4ae28",
+    "candidate_id": "cand-a96b9d97ac",
+    "model_name": "qwen3-32b",
+    "task_name": "gcd",
+    "prompt_mode": "interpreter_as_spec",
+    "success": 0,
+    "score": 0.254,
+    "notes": "Fails on prior-entrenched task",
+    "created_at": "2026-04-20T00:33:22.420058+00:00"
+  }
+]

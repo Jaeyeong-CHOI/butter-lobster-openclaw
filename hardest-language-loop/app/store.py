@@ -9,6 +9,10 @@ from typing import Any, Iterator
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "loop.db"
 
+DEFAULT_SETTINGS = {
+    "agent2_model": "gpt-5.4",
+}
+
 
 def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
     if row is None:
@@ -70,6 +74,11 @@ def init_db() -> None:
                 payload_json TEXT NOT NULL,
                 created_at TEXT NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value_json TEXT NOT NULL
+            );
             """
         )
         conn.execute(
@@ -79,6 +88,11 @@ def init_db() -> None:
             ON CONFLICT(id) DO NOTHING
             """
         )
+        for key, value in DEFAULT_SETTINGS.items():
+            conn.execute(
+                "INSERT INTO settings(key, value_json) VALUES (?, ?) ON CONFLICT(key) DO NOTHING",
+                (key, json.dumps(value, ensure_ascii=False)),
+            )
         conn.commit()
 
 
@@ -111,6 +125,23 @@ def get_loop_state() -> dict[str, Any]:
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM loop_state WHERE id = 1").fetchone()
         return row_to_dict(row) or {"status": "idle", "iteration": 0}
+
+
+def get_settings() -> dict[str, Any]:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT key, value_json FROM settings").fetchall()
+        out = dict(DEFAULT_SETTINGS)
+        for row in rows:
+            out[row["key"]] = json.loads(row["value_json"])
+        return out
+
+
+def set_setting(key: str, value: Any) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO settings(key, value_json) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json",
+            (key, json.dumps(value, ensure_ascii=False)),
+        )
 
 
 def insert_candidate(candidate: dict[str, Any]) -> None:
@@ -234,6 +265,7 @@ def get_overview() -> dict[str, Any]:
         ).fetchone()
         return {
             "state": state,
+            "settings": get_settings(),
             "stats": {
                 "total_candidates": total_candidates,
                 "archived_candidates": archived,

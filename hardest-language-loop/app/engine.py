@@ -11,12 +11,16 @@ from typing import Any
 from . import store
 from .artifacts import materialize_candidate_bundle
 
-MODELS = [
-    {"name": "gpt-5.4", "skill": 0.82, "prior_strength": 0.92},
-    {"name": "gpt-5.4-mini", "skill": 0.69, "prior_strength": 0.78},
-    {"name": "o4-mini", "skill": 0.88, "prior_strength": 0.71},
-    {"name": "qwen3-32b", "skill": 0.63, "prior_strength": 0.80},
-]
+OPENAI_MODEL_CATALOG = {
+    "gpt-5.4": {"name": "gpt-5.4", "skill": 0.82, "prior_strength": 0.92},
+    "gpt-5.4-mini": {"name": "gpt-5.4-mini", "skill": 0.69, "prior_strength": 0.78},
+    "gpt-5.4-nano": {"name": "gpt-5.4-nano", "skill": 0.57, "prior_strength": 0.83},
+    "gpt-4.1": {"name": "gpt-4.1", "skill": 0.76, "prior_strength": 0.89},
+    "gpt-4.1-mini": {"name": "gpt-4.1-mini", "skill": 0.63, "prior_strength": 0.82},
+    "gpt-4o": {"name": "gpt-4o", "skill": 0.74, "prior_strength": 0.87},
+    "gpt-4o-mini": {"name": "gpt-4o-mini", "skill": 0.58, "prior_strength": 0.79},
+    "o4-mini": {"name": "o4-mini", "skill": 0.88, "prior_strength": 0.71},
+}
 
 TASKS = [
     {"name": "abs", "entrenchment": 0.15},
@@ -143,6 +147,8 @@ class AgentLoopService:
         return random.choice(pool[: min(5, len(pool))])
 
     def _generate_candidate(self, iteration: int, parent: dict[str, Any] | None) -> dict[str, Any]:
+        settings = store.get_settings()
+        agent2_model = settings.get("agent2_model", "gpt-5.4")
         rnd = random.Random(iteration * 7919)
         level, mutation_summary, interpreter_hint = MUTATIONS[iteration % len(MUTATIONS)]
         parent_similarity = float(parent.get("similarity_score", 0.95)) if parent else 0.95
@@ -167,6 +173,7 @@ class AgentLoopService:
             "metadata": {
                 "prompt_mode_default": "interpreter_as_spec",
                 "agent1_parent": parent.get("name") if parent else "None",
+                "agent2_model": agent2_model,
                 "python_near": similarity > 0.72,
                 "task_bank": [t["name"] for t in TASKS],
             },
@@ -174,30 +181,32 @@ class AgentLoopService:
         }
 
     def _simulate_solver(self, candidate: dict[str, Any]) -> list[dict[str, Any]]:
+        settings = store.get_settings()
+        model_name = settings.get("agent2_model", "gpt-5.4")
+        model = OPENAI_MODEL_CATALOG.get(model_name, OPENAI_MODEL_CATALOG["gpt-5.4"])
         rnd = random.Random(candidate["id"])
         rows = []
-        for model in MODELS:
-            for task in TASKS:
-                prior_penalty = task["entrenchment"] * candidate["conflict_score"] * model["prior_strength"]
-                capability = model["skill"] * candidate["solvable_score"]
-                prompt_bonus = 0.08 if candidate["level"] in {"L1", "L2", "L3"} else -0.05
-                raw = capability - prior_penalty + prompt_bonus + rnd.uniform(-0.08, 0.08)
-                success = raw > 0.18
-                score = max(0.0, min(1.0, 0.5 + raw))
-                notes = "Fails on prior-entrenched task" if not success and task["entrenchment"] > 0.8 else ""
-                rows.append(
-                    {
-                        "id": f"eval-{uuid.uuid4().hex[:12]}",
-                        "candidate_id": candidate["id"],
-                        "model_name": model["name"],
-                        "task_name": task["name"],
-                        "prompt_mode": "interpreter_as_spec",
-                        "success": success,
-                        "score": round(score, 3),
-                        "notes": notes,
-                        "created_at": now_iso(),
-                    }
-                )
+        for task in TASKS:
+            prior_penalty = task["entrenchment"] * candidate["conflict_score"] * model["prior_strength"]
+            capability = model["skill"] * candidate["solvable_score"]
+            prompt_bonus = 0.08 if candidate["level"] in {"L1", "L2", "L3"} else -0.05
+            raw = capability - prior_penalty + prompt_bonus + rnd.uniform(-0.08, 0.08)
+            success = raw > 0.18
+            score = max(0.0, min(1.0, 0.5 + raw))
+            notes = "Fails on prior-entrenched task" if not success and task["entrenchment"] > 0.8 else ""
+            rows.append(
+                {
+                    "id": f"eval-{uuid.uuid4().hex[:12]}",
+                    "candidate_id": candidate["id"],
+                    "model_name": model["name"],
+                    "task_name": task["name"],
+                    "prompt_mode": "interpreter_as_spec",
+                    "success": success,
+                    "score": round(score, 3),
+                    "notes": notes,
+                    "created_at": now_iso(),
+                }
+            )
         return rows
 
     def _analyze(self, candidate: dict[str, Any], evaluations: list[dict[str, Any]]) -> dict[str, Any]:

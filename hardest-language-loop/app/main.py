@@ -2,17 +2,18 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import store
 from .artifacts import load_candidate_bundle, materialize_candidate_bundle
-from .engine import AgentLoopService
+from .engine import AgentLoopService, OPENAI_MODEL_CATALOG
 
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
@@ -43,6 +44,36 @@ async def index() -> FileResponse:
 @app.get("/api/overview")
 async def api_overview() -> JSONResponse:
     return JSONResponse(store.get_overview())
+
+
+@app.get("/api/config")
+async def api_config() -> JSONResponse:
+    settings = store.get_settings()
+    return JSONResponse(
+        {
+            "settings": settings,
+            "openai_models": list(OPENAI_MODEL_CATALOG.keys()),
+        }
+    )
+
+
+@app.post("/api/config")
+async def api_config_update(payload: dict = Body(...)) -> JSONResponse:
+    agent2_model = payload.get("agent2_model")
+    if agent2_model is not None:
+        if agent2_model not in OPENAI_MODEL_CATALOG:
+            raise HTTPException(status_code=400, detail="Unknown Agent 2 model")
+        store.set_setting("agent2_model", agent2_model)
+        store.insert_event(
+            "config_updated",
+            {
+                "message": "Agent 2 model updated",
+                "agent2_model": agent2_model,
+                "note": "Applies to new iterations. Reset loop for a clean benchmark history.",
+            },
+            datetime.now(timezone.utc).isoformat(),
+        )
+    return JSONResponse({"ok": True, "settings": store.get_settings(), "openai_models": list(OPENAI_MODEL_CATALOG.keys())})
 
 
 @app.get("/api/candidates")

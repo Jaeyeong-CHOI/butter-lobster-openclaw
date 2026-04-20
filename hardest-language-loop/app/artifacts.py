@@ -108,6 +108,7 @@ def run_program(source: str, tests: list[dict]) -> dict:
 
 
 def _agent_prompts(candidate: dict[str, Any], parent_name: str | None) -> dict[str, str]:
+    agent2_model = (candidate.get("metadata", {}) or {}).get("agent2_model", "gpt-5.4")
     return {
         "prompts/agent1_newpl.txt": f"""You are Agent 1 (NewPL Searcher).
 
@@ -130,6 +131,8 @@ Interpreter hint:
 {candidate['interpreter_hint']}
 """,
         "prompts/agent2_solver.txt": f"""You are Agent 2 (Solver Bench).
+
+Selected OpenAI model: {agent2_model}
 
 This code defines our programming language.
 [interpreter.py]
