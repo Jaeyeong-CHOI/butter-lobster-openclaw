@@ -1,0 +1,172 @@
+{
+  "candidate_id": "cand-344a10c7f4",
+  "validator_mode": "json -> schema check -> AST reconstruction -> interpreter execution -> output comparison",
+  "summary": {
+    "total_evaluations": 16,
+    "total_success": 10,
+    "total_failure": 6,
+    "failure_rate": 0.375
+  },
+  "rows": [
+    {
+      "model_name": "gpt-5.4",
+      "task_name": "abs",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 1.0,
+      "notes": ""
+    },
+    {
+      "model_name": "gpt-5.4",
+      "task_name": "max",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 1.0,
+      "notes": ""
+    },
+    {
+      "model_name": "gpt-5.4",
+      "task_name": "fib",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.512,
+      "notes": "Fails on prior-entrenched task"
+    },
+    {
+      "model_name": "gpt-5.4",
+      "task_name": "gcd",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.497,
+      "notes": "Fails on prior-entrenched task"
+    },
+    {
+      "model_name": "gpt-5.4-mini",
+      "task_name": "abs",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 1.0,
+      "notes": ""
+    },
+    {
+      "model_name": "gpt-5.4-mini",
+      "task_name": "max",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 1.0,
+      "notes": ""
+    },
+    {
+      "model_name": "gpt-5.4-mini",
+      "task_name": "fib",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.557,
+      "notes": "Fails on prior-entrenched task"
+    },
+    {
+      "model_name": "gpt-5.4-mini",
+      "task_name": "gcd",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.466,
+      "notes": "Fails on prior-entrenched task"
+    },
+    {
+      "model_name": "o4-mini",
+      "task_name": "abs",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 1.0,
+      "notes": ""
+    },
+    {
+      "model_name": "o4-mini",
+      "task_name": "max",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 1.0,
+      "notes": ""
+    },
+    {
+      "model_name": "o4-mini",
+      "task_name": "fib",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 0.773,
+      "notes": ""
+    },
+    {
+      "model_name": "o4-mini",
+      "task_name": "gcd",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 0.812,
+      "notes": ""
+    },
+    {
+      "model_name": "qwen3-32b",
+      "task_name": "abs",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 1.0,
+      "notes": ""
+    },
+    {
+      "model_name": "qwen3-32b",
+      "task_name": "max",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 0.944,
+      "notes": ""
+    },
+    {
+      "model_name": "qwen3-32b",
+      "task_name": "fib",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.381,
+      "notes": "Fails on prior-entrenched task"
+    },
+    {
+      "model_name": "qwen3-32b",
+      "task_name": "gcd",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.474,
+      "notes": "Fails on prior-entrenched task"
+    }
+  ]
+}

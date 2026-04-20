@@ -1,26 +1,30 @@
 [
   {
-    "name": "abs",
-    "prompt": "Write abs_val(x).",
+    "task_name": "abs",
+    "prompt": "Implement abs_val(x)",
+    "category": "neutral",
     "expected_behavior": "Return the absolute value of x.",
-    "reason": "Neutral/simple task."
+    "reason": "Sanity-check for JSON AST generation and interpreter execution."
   },
   {
-    "name": "max",
-    "prompt": "Write max_val(a, b).",
+    "task_name": "max",
+    "prompt": "Implement max_val(a, b)",
+    "category": "neutral",
     "expected_behavior": "Return the larger of two values.",
-    "reason": "Low entrenchment sanity check."
+    "reason": "Low-entrenchment control task."
   },
   {
-    "name": "fib",
-    "prompt": "Write fib(n).",
-    "expected_behavior": "Implement Fibonacci under candidate semantics. Multiple conflicts are composed: keyword, syntax, and semantic shifts.",
-    "reason": "Prior-entrenched canonical task."
+    "task_name": "fib",
+    "prompt": "Implement fib(n)",
+    "category": "prior-entrenched",
+    "expected_behavior": "Implement Fibonacci under candidate semantics. Keyword, syntax, and semantic conflict are composed together.",
+    "reason": "Canonical prior-entrenched task."
   },
   {
-    "name": "gcd",
-    "prompt": "Write gcd(a, b).",
-    "expected_behavior": "Implement Euclidean GCD under candidate semantics. Multiple conflicts are composed: keyword, syntax, and semantic shifts.",
-    "reason": "Prior-entrenched canonical task."
+    "task_name": "gcd",
+    "prompt": "Implement gcd(a, b)",
+    "category": "prior-entrenched",
+    "expected_behavior": "Implement Euclidean GCD under candidate semantics. Keyword, syntax, and semantic conflict are composed together.",
+    "reason": "Second canonical prior-entrenched task."
   }
 ]

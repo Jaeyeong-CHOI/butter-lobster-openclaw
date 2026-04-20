@@ -1,24 +1,3 @@
-# PL-024 L5
-
-- **Candidate ID:** cand-a96b9d97ac
-- **Level:** L5
-- **Parent:** L3 InvertedIf Seed
-- **Status:** discarded
-- **Archived:** no
-
-## Mutation Summary
-Compound conflict bundle
-
-## Interpreter Hint
-Keyword remapping, syntax shifts, and inverted semantics are combined in one language.
-
-## Pipeline
-1. Agent A mutates or creates the interpreter.
-2. Agent B generates a JSON AST program for the task.
-3. The deterministic validator parses JSON, reconstructs AST, executes the interpreter, and compares outputs.
-
-## Structured Spec
-```json
 {
   "candidate_id": "cand-a96b9d97ac",
   "name": "PL-024 L5",
@@ -57,4 +36,3 @@ Keyword remapping, syntax shifts, and inverted semantics are combined in one lan
     "prior_boundary": true
   }
 }
-```
