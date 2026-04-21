@@ -91,11 +91,31 @@ TASKS = [
 ]
 
 MUTATIONS = [
-    ("L1", "Cross-keyword remap", "Python surface mostly preserved; core keywords are remapped to conflicting tokens."),
-    ("L2", "Block syntax inversion", "Function and block delimiters remain Python-near, but control-flow syntax is restructured."),
-    ("L3", "Inverted-if semantics", "Conditionals execute on FALSE; comparison and boolean behavior partially conflict with Python."),
-    ("L4", "Example-only semantic induction", "Rules are not stated; only interpreter code and examples imply the semantics."),
-    ("L5", "Compound conflict bundle", "Keyword remapping, syntax shifts, and inverted semantics are combined in one language."),
+    {
+        "family": "token_conflict",
+        "mutation_summary": "Keyword aliases and token remaps are introduced while the overall language shape stays Python-near.",
+        "interpreter_hint": "Surface keywords are deliberately remapped to conflict with Python priors.",
+    },
+    {
+        "family": "syntax_conflict",
+        "mutation_summary": "Control structures and declaration syntax are reshaped while the runtime remains mostly familiar.",
+        "interpreter_hint": "Surface syntax is reorganized before execution.",
+    },
+    {
+        "family": "semantic_conflict",
+        "mutation_summary": "Core control-flow behavior is inverted or reweighted against Python expectations.",
+        "interpreter_hint": "Execution rules conflict with the Python prior in key branching cases.",
+    },
+    {
+        "family": "implicit_semantic_conflict",
+        "mutation_summary": "The crucial runtime rule is implicit in examples/interpreter behavior rather than stated up front.",
+        "interpreter_hint": "The model has to infer the runtime rule from behavior, not a clean natural-language summary.",
+    },
+    {
+        "family": "compound_conflict",
+        "mutation_summary": "Keyword, syntax, and semantic conflicts are bundled together in one candidate language.",
+        "interpreter_hint": "Multiple prior-breaking mechanisms are combined in the same interpreter.",
+    },
 ]
 
 
@@ -174,28 +194,20 @@ class AgentLoopService:
         pool = sorted(pool, key=lambda c: (c.get("failure_rate", 0), c.get("conflict_score", 0)), reverse=True)
         return random.choice(pool[: min(6, len(pool))])
 
-    def _next_strategy(self, level: str, iteration: int, parent: dict[str, Any] | None) -> tuple[str, str]:
+    def _next_strategy(self, family: str, iteration: int, parent: dict[str, Any] | None) -> tuple[str, str]:
         parent_meta = (parent or {}).get("metadata", {}) or {}
         existing_family = parent_meta.get("strategy_family")
         variants = {
-            "L1": ["alias_swap", "keyword_shadow", "surface_synonym"],
-            "L2": ["block_syntax_inversion", "delimiter_shift", "header_rewrite"],
-            "L3": ["inverted_if", "inverted_base_case", "comparison_flip"],
-            "L4": ["example_only_rule_induction", "silent_branch_rule", "implicit_operator_shift"],
-            "L5": ["keyword_plus_syntax_plus_semantics", "compound_control_bundle", "stacked_prior_conflict"],
-            "Seed": ["baseline_reference"],
+            "token_conflict": ["alias_swap", "keyword_shadow", "surface_synonym"],
+            "syntax_conflict": ["block_syntax_inversion", "delimiter_shift", "header_rewrite"],
+            "semantic_conflict": ["inverted_if", "inverted_base_case", "comparison_flip"],
+            "implicit_semantic_conflict": ["example_only_rule_induction", "silent_branch_rule", "implicit_operator_shift"],
+            "compound_conflict": ["keyword_plus_syntax_plus_semantics", "compound_control_bundle", "stacked_prior_conflict"],
         }
-        family = {
-            "Seed": "baseline_python_near",
-            "L1": "token_conflict",
-            "L2": "syntax_conflict",
-            "L3": "semantic_conflict",
-            "L4": "implicit_semantic_conflict",
-            "L5": "compound_conflict",
-        }.get(level, existing_family or "semantic_conflict")
-        leaves = variants.get(level, ["inverted_if"])
+        chosen_family = family or existing_family or "semantic_conflict"
+        leaves = variants.get(chosen_family, ["inverted_if"])
         leaf = leaves[iteration % len(leaves)]
-        return family, leaf
+        return chosen_family, leaf
 
     def _generate_candidate(self, iteration: int, parent: dict[str, Any] | None) -> dict[str, Any]:
         settings = store.get_settings()
@@ -209,8 +221,11 @@ class AgentLoopService:
         solver_parallelism = int(settings.get("solver_parallelism", 10))
 
         rnd = random.Random(iteration * 7919)
-        level, mutation_summary, interpreter_hint = MUTATIONS[iteration % len(MUTATIONS)]
-        strategy_family, strategy_leaf = self._next_strategy(level, iteration, parent)
+        mutation = MUTATIONS[iteration % len(MUTATIONS)]
+        strategy_family = mutation["family"]
+        mutation_summary = mutation["mutation_summary"]
+        interpreter_hint = mutation["interpreter_hint"]
+        strategy_family, strategy_leaf = self._next_strategy(strategy_family, iteration, parent)
         parent_similarity = float(parent.get("similarity_score", 0.95)) if parent else 0.95
         agent_a_thinking_bonus = THINKING_BONUS.get(agent_a_thinking, 0.03)
         similarity = max(0.45, min(0.98, parent_similarity + rnd.uniform(-0.08, 0.03)))
@@ -229,8 +244,8 @@ class AgentLoopService:
         return {
             "id": f"cand-{uuid.uuid4().hex[:10]}",
             "parent_id": parent.get("id") if parent else None,
-            "level": level,
-            "name": f"PL-{iteration:03d} {level}",
+            "level": strategy_family,
+            "name": f"PL-{iteration:03d}",
             "mutation_summary": mutation_summary,
             "interpreter_hint": interpreter_hint,
             "similarity_score": round(similarity, 3),
@@ -311,7 +326,9 @@ class AgentLoopService:
 Return ONLY a JSON object for a top-level exp AST.
 No markdown fences. No explanation.
 
-Candidate: {candidate['name']} ({candidate['level']})
+Candidate: {candidate['name']}
+Strategy family: {candidate['metadata'].get('strategy_family')}
+Strategy leaf: {candidate['metadata'].get('strategy_leaf')}
 Mutation summary: {candidate['mutation_summary']}
 Task: {task['task_name']}
 Entry function name: {task['entry_name']}
@@ -398,7 +415,7 @@ Interpreter:
         rnd = random.Random(seed)
         prior_penalty = entrenchment * candidate["conflict_score"] * model["prior_strength"]
         capability = model["skill"] * candidate["solvable_score"]
-        prompt_bonus = 0.08 if candidate["level"] in {"L1", "L2", "L3"} else -0.05
+        prompt_bonus = 0.08 if candidate["metadata"].get("strategy_family") in {"token_conflict", "syntax_conflict", "semantic_conflict"} else -0.05
         thinking_bonus = THINKING_BONUS.get(thinking, 0.03)
         stability_penalty = abs(temperature - 0.2) * 0.08
         raw_score = capability - prior_penalty + prompt_bonus + thinking_bonus - stability_penalty + rnd.uniform(-0.08, 0.08)
@@ -688,7 +705,8 @@ Interpreter:
                 "iteration": iteration,
                 "candidate_id": candidate["id"],
                 "name": candidate["name"],
-                "level": candidate["level"],
+                "strategy_family": candidate["metadata"].get("strategy_family"),
+                "strategy_leaf": candidate["metadata"].get("strategy_leaf"),
                 "parent": parent.get("name") if parent else None,
                 "manual": manual,
             },

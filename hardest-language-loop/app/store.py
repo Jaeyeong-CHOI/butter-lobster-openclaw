@@ -310,16 +310,21 @@ def _benchmark_summary(conn: sqlite3.Connection) -> dict[str, Any]:
         FROM evaluations GROUP BY task_name ORDER BY pass_rate ASC, task_name ASC
         """
     ).fetchall()
-    level_rows = conn.execute(
+    family_rows = conn.execute(
         """
-        SELECT level, COUNT(*) AS n, AVG(failure_rate) AS avg_failure, SUM(CASE WHEN archived = 1 THEN 1 ELSE 0 END) AS archived_n
-        FROM candidates GROUP BY level ORDER BY avg_failure DESC
+        SELECT COALESCE(json_extract(metadata_json, '$.strategy_family'), level) AS strategy_family,
+               COUNT(*) AS n,
+               AVG(failure_rate) AS avg_failure,
+               SUM(CASE WHEN archived = 1 THEN 1 ELSE 0 END) AS archived_n
+        FROM candidates
+        GROUP BY COALESCE(json_extract(metadata_json, '$.strategy_family'), level)
+        ORDER BY avg_failure DESC
         """
     ).fetchall()
     return {
         "models": [row_to_dict(r) for r in model_rows],
         "tasks": [row_to_dict(r) for r in task_rows],
-        "levels": [row_to_dict(r) for r in level_rows],
+        "families": [row_to_dict(r) for r in family_rows],
     }
 
 

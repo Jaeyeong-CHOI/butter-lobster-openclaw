@@ -76,7 +76,7 @@ const metricGuideEntries = [
   ['Novelty', '기존 후보와 얼마나 다른지에 대한 추정치다.'],
   ['Task Bank', '현재 후보를 평가할 문제 세트 목록이다.'],
   ['Agent A 설정', '언어를 생성/변이하는 모델과 파라미터다.'],
-  ['Solver Bench 설정', '평가할 모델 풀, 반복 횟수, 병렬도, thinking, temperature를 의미한다.'],
+  ['Solver Bench 설정', '평가할 모델 풀, 반복 횟수, 최대 동시 요청 수, thinking, temperature를 의미한다.'],
   ['모델별 Pass', '각 모델이 모든 반복 시도 중 몇 번 성공했는지 / 전체 시도 수를 뜻한다.'],
   ['Failure rate', '전체 평가 중 실패 비율이다. 높을수록 어려운 언어다.'],
 ];
@@ -197,13 +197,13 @@ function settingsPreviewText(config) {
   if (!config) return '설정을 불러오는 중…';
   const agentA = config.agent_a;
   const bench = config.solver_bench;
-  return `A · ${agentA.model} · ${thinkingLabel(agentA.thinking)} · temp ${agentA.temperature}  |  Bench · ${bench.enabled_models.length} models · x${bench.repeat_count} · parallel ${bench.parallelism}`;
+  return `A · ${agentA.model} · ${thinkingLabel(agentA.thinking)} · temp ${agentA.temperature}  |  Bench · ${bench.enabled_models.length} models · x${bench.repeat_count} · 최대 동시 ${bench.parallelism}`;
 }
 
 function configHintText(config) {
   if (!config) return '설정 불러오는 중…';
   const bench = config.solver_bench;
-  return `A: ${config.agent_a.model} / ${thinkingLabel(config.agent_a.thinking)} / ${config.agent_a.temperature} · Bench: ${bench.enabled_models.length} models × ${bench.repeat_count}회 · parallel ${bench.parallelism}`;
+  return `A: ${config.agent_a.model} / ${thinkingLabel(config.agent_a.thinking)} / ${config.agent_a.temperature} · Bench: ${bench.enabled_models.length} models × ${bench.repeat_count}회 · 최대 동시 ${bench.parallelism}개`;
 }
 
 function setActionState(button, { disabled = false, active = false } = {}) {
@@ -344,7 +344,7 @@ async function refreshOverview() {
     metricCard('후보 수', data.stats.total_candidates, '생성된 candidate'),
     metricCard('Archive', data.stats.archived_candidates, 'hard-but-valid'),
     metricCard('총 평가 수', data.stats.total_evaluations, '모델 × 문제 × 반복'),
-    metricCard('Solver Bench', config ? `${config.solver_bench.enabled_models.length} models` : '—', config ? `x${config.solver_bench.repeat_count} · parallel ${config.solver_bench.parallelism}` : '설정 로딩 중'),
+    metricCard('Solver Bench', config ? `${config.solver_bench.enabled_models.length} models` : '—', config ? `x${config.solver_bench.repeat_count} · 최대 동시 ${config.solver_bench.parallelism}` : '설정 로딩 중'),
     metricCard('현재 hardest', hardest.name || '—', hardest.failure_rate != null ? `failure ${percent(hardest.failure_rate)}` : '아직 없음'),
   ].join('');
 
@@ -354,7 +354,7 @@ async function refreshOverview() {
 }
 
 function renderBenchmark() {
-  const benchmark = state.overview?.benchmark || { models: [], tasks: [], levels: [] };
+  const benchmark = state.overview?.benchmark || { models: [], tasks: [], families: [] };
 
   const makeSection = (title, rows, titleField, valueField, fallback) => {
     if (!rows?.length) return `<div class="summary-card"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(fallback)}</p></div>`;
@@ -382,7 +382,7 @@ function renderBenchmark() {
   benchmarkContent.innerHTML = [
     makeSection('모델별 성공률', benchmark.models, 'model_name', 'pass_rate', '아직 모델 결과가 없음'),
     makeSection('문제별 성공률', benchmark.tasks, 'task_name', 'pass_rate', '아직 태스크 결과가 없음'),
-    makeSection('레벨별 평균 실패율', benchmark.levels, 'level', 'avg_failure', '아직 레벨 결과가 없음'),
+    makeSection('전략 family별 평균 실패율', benchmark.families, 'strategy_family', 'avg_failure', '아직 family 결과가 없음'),
   ].join('');
 }
 
@@ -406,7 +406,7 @@ function renderFocusCard() {
         <div class="focus-copy">${escapeHtml(detail.mutation_summary)}</div>
       </div>
       <div class="focus-pills">
-        ${pill(detail.level, 'tone-neutral')}
+        ${pill(meta.strategy_family || 'unclassified', 'tone-neutral')}
         ${pill(`failure ${percent(detail.failure_rate)}`, 'tone-accent')}
         ${pill(meta.strategy_leaf || 'strategy n/a', 'tone-purple')}
         ${pill(detail.status || 'generated', detail.archived ? 'tone-green' : 'tone-neutral')}
@@ -419,12 +419,14 @@ function renderFocusCard() {
       ${kv('Solvable', detail.solvable_score ?? '—')}
       ${kv('Novelty', detail.novelty_score ?? '—')}
       ${kv('Task Bank', Array.isArray(meta.task_bank) ? meta.task_bank.join(', ') : '—')}
+      ${kv('Strategy family', meta.strategy_family || '—')}
+      ${kv('Strategy leaf', meta.strategy_leaf || '—')}
       ${kv('Agent A 모델', settings.agent_a.model)}
       ${kv('Agent A thinking', thinkingLabel(settings.agent_a.thinking))}
       ${kv('Agent A temp', settings.agent_a.temperature)}
       ${kv('Bench models', settings.solver_bench.enabled_models.length)}
       ${kv('반복 횟수', settings.solver_bench.repeat_count)}
-      ${kv('병렬 요청', settings.solver_bench.parallelism)}
+      ${kv('최대 동시 요청', settings.solver_bench.parallelism)}
       ${kv('진행률', progressText)}
     </div>
   `;
@@ -439,7 +441,7 @@ function filteredCandidates() {
       if (![meta.strategy_family, meta.strategy_leaf].includes(state.treeFilter)) return false;
     }
     if (!q) return true;
-    const hay = [candidate.name, candidate.level, candidate.mutation_summary, meta.strategy_family || '', meta.strategy_leaf || '', candidate.status || ''].join(' ').toLowerCase();
+    const hay = [candidate.name, candidate.mutation_summary, meta.strategy_family || '', meta.strategy_leaf || '', candidate.status || ''].join(' ').toLowerCase();
     return hay.includes(q);
   });
 }
@@ -452,7 +454,7 @@ function candidateRow(candidate) {
     <div class="candidate-item ${active}" data-id="${candidate.id}">
       <div class="candidate-topline">
         <div class="candidate-title">${escapeHtml(candidate.name)}</div>
-        <div class="candidate-level">${escapeHtml(candidate.level)}</div>
+        <div class="candidate-level">${escapeHtml(meta.strategy_family || 'strategy')}</div>
       </div>
       <div class="candidate-meta candidate-summary">${escapeHtml(candidate.mutation_summary)}</div>
       <div class="pills">
@@ -693,7 +695,7 @@ function renderSolverBenchMonitor() {
       ${kv('진행률', `${completed}/${expectedTotal}`)}
       ${kv('성공 수', `${passed}/${completed || expectedTotal || 0}`)}
       ${kv('반복 횟수', repeatCount)}
-      ${kv('병렬 요청', settings.parallelism)}
+      ${kv('최대 동시 요청', settings.parallelism)}
       ${kv('Thinking', thinkingLabel(settings.thinking))}
       ${kv('Temperature', settings.temperature)}
     </div>
@@ -723,8 +725,9 @@ function showCandidateInspector(detail) {
   inspectorContent.innerHTML = `
     <div class="inspector-section">
       ${inspectorCard('후보 요약', `
-        <p><strong>${escapeHtml(detail.name)}</strong> (${escapeHtml(detail.level)})<br>${escapeHtml(detail.mutation_summary)}</p>
+        <p><strong>${escapeHtml(detail.name)}</strong><br>${escapeHtml(detail.mutation_summary)}</p>
         <div class="pills">
+          ${pill(meta.strategy_family || 'unclassified', 'tone-neutral')}
           ${pill(`failure ${percent(detail.failure_rate)}`, 'tone-accent')}
           ${pill(meta.strategy_leaf || 'strategy n/a', 'tone-purple')}
           ${pill(detail.status || 'generated', detail.archived ? 'tone-green' : 'tone-neutral')}
@@ -742,7 +745,7 @@ function showCandidateInspector(detail) {
         <div class="inspector-grid">
           ${kv('Enabled models', settings.solver_bench.enabled_models.join(', '))}
           ${kv('Repeat count', settings.solver_bench.repeat_count)}
-          ${kv('Parallelism', settings.solver_bench.parallelism)}
+          ${kv('최대 동시 요청', settings.solver_bench.parallelism)}
           ${kv('Thinking', thinkingLabel(settings.solver_bench.thinking))}
           ${kv('Temperature', settings.solver_bench.temperature)}
         </div>
@@ -808,7 +811,7 @@ async function selectCandidate(id, { updateInspector = true } = {}) {
   state.selectedId = id;
   const detail = await getJson(`/api/candidates/${id}`);
   state.selectedCandidate = detail;
-  selectedHint.textContent = `${detail.name} · ${detail.level}`;
+  selectedHint.textContent = `${detail.name} · ${detail.metadata?.strategy_family || 'strategy'}`;
   renderFocusCard();
   renderSolverBenchMonitor();
   renderCandidateList();
@@ -827,8 +830,8 @@ function eventSummary(event) {
     case 'loop_started': return { title: '루프 시작', summary: payload.message || '자동 탐색 시작' };
     case 'loop_paused': return { title: '루프 멈춤', summary: payload.message || '자동 탐색 일시정지' };
     case 'loop_reset': return { title: '기록 초기화', summary: payload.message || '후보/평가/이벤트가 초기화됨' };
-    case 'candidate_generated': return { title: `${payload.name || payload.candidate_id || 'candidate'} 생성`, summary: `iteration ${payload.iteration || '-'} · level ${payload.level || '-'}${payload.parent ? ` · parent ${payload.parent}` : ''}` };
-    case 'solver_bench_started': return { title: 'Solver Bench 시작', summary: `${payload.models?.length || 0} models · x${payload.repeat_count || 1} · parallel ${payload.parallelism || 1}` };
+    case 'candidate_generated': return { title: `${payload.name || payload.candidate_id || 'candidate'} 생성`, summary: `iteration ${payload.iteration || '-'} · ${payload.strategy_family || 'strategy'} / ${payload.strategy_leaf || 'branch'}${payload.parent ? ` · parent ${payload.parent}` : ''}` };
+    case 'solver_bench_started': return { title: 'Solver Bench 시작', summary: `${payload.models?.length || 0} models · x${payload.repeat_count || 1} · 최대 동시 ${payload.parallelism || 1}개` };
     case 'solver_progress': return { title: 'Solver 진행 중', summary: `${payload.completed || 0}/${payload.total || 0} · ${payload.model_name || ''} · ${payload.task_name || ''} · attempt ${payload.attempt_index || 0}` };
     case 'benchmark_completed': return { title: '벤치마크 완료', summary: `${payload.candidate_id || ''} · failure ${percent(payload.failure_rate)} · total evals ${payload.total_evals || 0}` };
     case 'archive_updated': return { title: 'Archive 업데이트', summary: payload.message || '새 hardest candidate가 archive에 추가됨' };

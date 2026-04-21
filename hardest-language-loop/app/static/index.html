@@ -73,7 +73,7 @@
             <span id="configHint" class="muted">loading…</span>
           </div>
           <div class="filters">
-            <input id="searchInput" class="search" placeholder="level, strategy, mutation으로 검색…" />
+            <input id="searchInput" class="search" placeholder="family, strategy, mutation으로 검색…" />
             <label class="checkbox"><input type="checkbox" id="archivedOnly" /> archive만 보기</label>
           </div>
           <div id="candidateList" class="candidate-list"></div>
@@ -242,7 +242,7 @@
                 <input id="solverRepeatCountInput" type="number" min="1" max="20" step="1" />
               </label>
               <label class="control-block">
-                <span>병렬 요청 수</span>
+                <span>최대 동시 요청 수</span>
                 <input id="solverParallelismInput" type="number" min="1" max="50" step="1" />
               </label>
             </div>
@@ -250,7 +250,7 @@
         </div>
 
         <div class="settings-modal-actions">
-          <div class="settings-help">모델 풀에 체크된 모델은 candidate 생성 후 각각 모든 task를 반복 시도한다. 병렬 요청 수를 너무 높이면 API rate limit에 걸릴 수 있다.</div>
+          <div class="settings-help">모델 풀에 체크된 모델은 candidate 생성 후 각각 모든 task를 반복 시도한다. 여기서 최대 동시 요청 수는 전체 작업 큐에서 동시에 진행되는 요청의 상한이며, 너무 높이면 API rate limit에 걸릴 수 있다.</div>
           <button id="saveSettingsBtn">설정 저장</button>
         </div>
       </section>

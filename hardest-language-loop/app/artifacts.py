@@ -12,15 +12,14 @@ CANDIDATE_ROOT = BASE_DIR / "data" / "candidates"
 
 
 def _task_bank(candidate: dict[str, Any]) -> list[dict[str, Any]]:
-    level = candidate.get("level", "L3")
+    family = ((candidate.get("metadata", {}) or {}).get("strategy_family") or candidate.get("level") or "semantic_conflict")
     semantics = {
-        "L1": "Keywords are remapped while core semantics stay close to Python.",
-        "L2": "Surface syntax differs from Python while execution remains structurally similar.",
-        "L3": "Core control-flow semantics are explicitly inverted.",
-        "L4": "Semantic rules are implicit in examples / interpreter behavior.",
-        "L5": "Keyword, syntax, and semantic conflict are composed together.",
-        "Seed": "Canonical Python-like baseline.",
-    }.get(level, "Python-near language with controlled semantic conflict.")
+        "token_conflict": "Keywords are remapped while core semantics stay close to Python.",
+        "syntax_conflict": "Surface syntax differs from Python while execution remains structurally similar.",
+        "semantic_conflict": "Core control-flow semantics are explicitly inverted.",
+        "implicit_semantic_conflict": "Semantic rules are implicit in examples / interpreter behavior.",
+        "compound_conflict": "Keyword, syntax, and semantic conflict are composed together.",
+    }.get(family, "Python-near language with controlled semantic conflict.")
     return [
         {
             "task_name": "abs",
@@ -81,7 +80,7 @@ def _task_bank(candidate: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-INVERTED_IF_LEVELS = {"L3", "L4", "L5"}
+INVERTED_IF_FAMILIES = {"semantic_conflict", "implicit_semantic_conflict", "compound_conflict"}
 
 
 def _num(n: int) -> dict[str, Any]:
@@ -104,23 +103,23 @@ def _binary(op: str, left: dict[str, Any], right: dict[str, Any]) -> dict[str, A
     return {"type": op, "left": left, "right": right}
 
 
-def _if_expr(level: str, cond: dict[str, Any], then_expr: dict[str, Any], else_expr: dict[str, Any]) -> dict[str, Any]:
-    if level in INVERTED_IF_LEVELS:
+def _if_expr(family: str, cond: dict[str, Any], then_expr: dict[str, Any], else_expr: dict[str, Any]) -> dict[str, Any]:
+    if family in INVERTED_IF_FAMILIES:
         return {"type": "IF", "cond": cond, "then": else_expr, "else": then_expr}
     return {"type": "IF", "cond": cond, "then": then_expr, "else": else_expr}
 
 
-def _task_body(task_name: str, level: str, success: bool) -> tuple[str, list[str], dict[str, Any]]:
+def _task_body(task_name: str, family: str, success: bool) -> tuple[str, list[str], dict[str, Any]]:
     if task_name == "abs":
         if success:
-            body = _if_expr(level, _binary("LESS", _var("x"), _num(0)), _binary("SUB", _num(0), _var("x")), _var("x"))
+            body = _if_expr(family, _binary("LESS", _var("x"), _num(0)), _binary("SUB", _num(0), _var("x")), _var("x"))
         else:
             body = _var("x")
         return "abs_val", ["x"], body
 
     if task_name == "max":
         if success:
-            body = _if_expr(level, _binary("LESS", _var("a"), _var("b")), _var("b"), _var("a"))
+            body = _if_expr(family, _binary("LESS", _var("a"), _var("b")), _var("b"), _var("a"))
         else:
             body = _var("a")
         return "max_val", ["a", "b"], body
@@ -128,7 +127,7 @@ def _task_body(task_name: str, level: str, success: bool) -> tuple[str, list[str
     if task_name == "fib":
         if success:
             body = _if_expr(
-                level,
+                family,
                 _binary("LESS", _var("n"), _num(2)),
                 _var("n"),
                 _binary(
@@ -144,11 +143,11 @@ def _task_body(task_name: str, level: str, success: bool) -> tuple[str, list[str
     if task_name == "gcd":
         if success:
             body = _if_expr(
-                level,
+                family,
                 _binary("EQUAL", _var("a"), _var("b")),
                 _var("a"),
                 _if_expr(
-                    level,
+                    family,
                     _binary("LESS", _var("a"), _var("b")),
                     _call("gcd", [_var("a"), _binary("SUB", _var("b"), _var("a"))]),
                     _call("gcd", [_binary("SUB", _var("a"), _var("b")), _var("b")]),
@@ -162,8 +161,8 @@ def _task_body(task_name: str, level: str, success: bool) -> tuple[str, list[str
 
 
 def _build_task_program(candidate: dict[str, Any], task: dict[str, Any], success: bool) -> dict[str, Any]:
-    level = candidate.get("level", "L3")
-    entry_name, params, body = _task_body(task["task_name"], level, success)
+    family = ((candidate.get("metadata", {}) or {}).get("strategy_family") or candidate.get("level") or "semantic_conflict")
+    entry_name, params, body = _task_body(task["task_name"], family, success)
     first_case_args = task.get("tests", [{"args": []}])[0]["args"]
     return {
         "type": "LETF",
@@ -348,23 +347,9 @@ let () =
 
 
 def _strategy_tree(candidate: dict[str, Any], parent_name: str | None) -> dict[str, Any]:
-    level = candidate.get("level", "L3")
-    selected_family = {
-        "Seed": "baseline_python_near",
-        "L1": "token_conflict",
-        "L2": "syntax_conflict",
-        "L3": "semantic_conflict",
-        "L4": "implicit_semantic_conflict",
-        "L5": "compound_conflict",
-    }.get(level, "semantic_conflict")
-    selected_leaf = {
-        "Seed": "baseline_reference",
-        "L1": "cross_keyword_swap",
-        "L2": "block_syntax_inversion",
-        "L3": "inverted_if",
-        "L4": "example_only_rule_induction",
-        "L5": "keyword_plus_syntax_plus_semantics",
-    }.get(level, "inverted_if")
+    meta = candidate.get("metadata", {}) or {}
+    selected_family = meta.get("strategy_family", "semantic_conflict")
+    selected_leaf = meta.get("strategy_leaf", "inverted_if")
 
     def fam_status(fam_id: str) -> str:
         return "selected" if fam_id == selected_family else "explored"
@@ -500,7 +485,7 @@ def _agent_graph(candidate: dict[str, Any]) -> dict[str, Any]:
 
 def _language_spec(candidate: dict[str, Any], parent_name: str | None) -> dict[str, Any]:
     meta = candidate.get("metadata", {}) or {}
-    level = candidate.get("level", "L3")
+    family = meta.get("strategy_family", candidate.get("level", "semantic_conflict"))
     agent_a_settings = meta.get(
         "agent_a_settings",
         {
@@ -524,7 +509,9 @@ def _language_spec(candidate: dict[str, Any], parent_name: str | None) -> dict[s
         ),
     )
     semantics = {
-        "control_flow": "inverted_if" if level in {"L3", "L4", "L5"} else "canonical_if",
+        "control_flow": "inverted_if" if family in INVERTED_IF_FAMILIES else "canonical_if",
+        "strategy_family": family,
+        "strategy_leaf": meta.get("strategy_leaf"),
         "syntax_mode": "python_near" if candidate.get("similarity_score", 0.0) >= 0.7 else "restructured",
         "submission_format": "json_ast_v1",
         "execution_mode": "interpreter_ml",
@@ -532,7 +519,8 @@ def _language_spec(candidate: dict[str, Any], parent_name: str | None) -> dict[s
     return {
         "candidate_id": candidate["id"],
         "name": candidate["name"],
-        "level": level,
+        "strategy_family": family,
+        "strategy_leaf": meta.get("strategy_leaf"),
         "parent": parent_name or candidate.get("parent_id"),
         "mutation_summary": candidate["mutation_summary"],
         "interpreter_hint": candidate["interpreter_hint"],
@@ -564,7 +552,8 @@ def _spec_markdown(candidate: dict[str, Any], parent_name: str | None) -> str:
     return f"""# {candidate['name']}
 
 - **Candidate ID:** {candidate['id']}
-- **Level:** {candidate['level']}
+- **Strategy family:** {candidate.get('metadata', {}).get('strategy_family', candidate.get('level'))}
+- **Strategy leaf:** {candidate.get('metadata', {}).get('strategy_leaf', 'n/a')}
 - **Parent:** {parent_name or candidate.get('parent_id') or 'None'}
 - **Status:** {candidate.get('status', 'generated')}
 - **Archived:** {'yes' if candidate.get('archived') else 'no'}
@@ -589,40 +578,35 @@ def _spec_markdown(candidate: dict[str, Any], parent_name: str | None) -> str:
 
 
 def _interpreter_code(candidate: dict[str, Any]) -> str:
-    level = candidate.get("level", "L3")
+    family = ((candidate.get("metadata", {}) or {}).get("strategy_family") or candidate.get("level") or "semantic_conflict")
     semantics = {
-        "L1": {
+        "token_conflict": {
             "comment": "(* token-conflict language: conflicting surface keywords are normalized before function lookup *)",
             "keyword_rule": "let normalize_keyword k = match k with | \"fn\" -> \"def\" | \"unless\" -> \"if\" | _ -> k",
             "if_rule": "let eval_if cond = cond",
         },
-        "L2": {
+        "syntax_conflict": {
             "comment": "(* syntax-conflict language: surface syntax is assumed to be normalized into the AST before evaluation *)",
             "keyword_rule": "let normalize_keyword k = k",
             "if_rule": "let eval_if cond = cond",
         },
-        "L3": {
+        "semantic_conflict": {
             "comment": "(* semantic-conflict language: IF executes its then-branch when the condition evaluates to FALSE *)",
             "keyword_rule": "let normalize_keyword k = k",
             "if_rule": "let eval_if cond = not cond",
         },
-        "L4": {
+        "implicit_semantic_conflict": {
             "comment": "(* implicit semantic language: the runtime inverts IF, but the rule is meant to be inferred from behavior/examples *)",
             "keyword_rule": "let normalize_keyword k = k",
             "if_rule": "let eval_if cond = not cond",
         },
-        "L5": {
+        "compound_conflict": {
             "comment": "(* compound conflict language: keyword remap + inverted IF semantics are both active in the runtime *)",
             "keyword_rule": "let normalize_keyword k = match k with | \"fn\" -> \"def\" | \"give\" -> \"return\" | _ -> k",
             "if_rule": "let eval_if cond = not cond",
         },
-        "Seed": {
-            "comment": "(* canonical Python-like baseline interpreter *)",
-            "keyword_rule": "let normalize_keyword k = k",
-            "if_rule": "let eval_if cond = cond",
-        },
     }.get(
-        level,
+        family,
         {
             "comment": "(* default interpreter semantics *)",
             "keyword_rule": "let normalize_keyword k = k",
@@ -975,7 +959,9 @@ Thinking: {agent_a.get('thinking', 'high')}
 Temperature: {agent_a.get('temperature', 0.7)}
 
 Parent language: {parent_name or 'None'}
-Target candidate: {candidate['name']} ({candidate['level']})
+Target candidate: {candidate['name']}
+Strategy family: {candidate.get('metadata', {}).get('strategy_family', candidate.get('level'))}
+Strategy leaf: {candidate.get('metadata', {}).get('strategy_leaf', 'n/a')}
 
 Your job:
 - create or mutate an OCaml interpreter
@@ -995,7 +981,7 @@ Enabled model pool: {', '.join(enabled_models)}
 Thinking: {solver_settings.get('thinking', 'medium')}
 Temperature: {solver_settings.get('temperature', 0.2)}
 Repeat count: {solver_settings.get('repeat_count', 1)}
-Parallelism: {solver_settings.get('parallelism', 1)}
+Max concurrent requests: {solver_settings.get('parallelism', 1)}
 
 Input artifacts:
 - interpreter.ml
