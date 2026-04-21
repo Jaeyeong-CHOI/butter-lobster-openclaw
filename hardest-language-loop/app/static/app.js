@@ -7,6 +7,7 @@ const state = {
   config: null,
   search: '',
   archivedOnly: false,
+  treeFilter: 'root',
   selectedTreeNode: 'root',
   selectedGraphNode: null,
   selectedGraphEdge: null,
@@ -17,6 +18,8 @@ const candidateList = document.getElementById('candidateList');
 const strategyTreeStage = document.getElementById('strategyTreeStage');
 const graphStage = document.getElementById('graphStage');
 const focusCard = document.getElementById('focusCard');
+const solverBenchMonitor = document.getElementById('solverBenchMonitor');
+const metricGuide = document.getElementById('metricGuide');
 const inspectorContent = document.getElementById('inspectorContent');
 const benchmarkContent = document.getElementById('benchmarkContent');
 const eventList = document.getElementById('eventList');
@@ -36,99 +39,47 @@ const pauseBtn = document.getElementById('pauseBtn');
 const stepBtn = document.getElementById('stepBtn');
 const resetBtn = document.getElementById('resetBtn');
 
-const agentControls = {
-  agent_a: {
-    model: document.getElementById('agentAModelSelect'),
-    thinking: document.getElementById('agentAThinkingSelect'),
-    temperature: document.getElementById('agentATemperatureInput'),
-    apiKey: document.getElementById('agentAKeyInput'),
-    keyStatus: document.getElementById('agentAKeyStatus'),
-    clearKeyBtn: document.getElementById('agentAClearKeyBtn'),
-    label: 'Agent A',
-  },
-  agent_b: {
-    model: document.getElementById('agentBModelSelect'),
-    thinking: document.getElementById('agentBThinkingSelect'),
-    temperature: document.getElementById('agentBTemperatureInput'),
-    apiKey: document.getElementById('agentBKeyInput'),
-    keyStatus: document.getElementById('agentBKeyStatus'),
-    clearKeyBtn: document.getElementById('agentBClearKeyBtn'),
-    label: 'Agent B',
-  },
-};
+const openaiKeyInput = document.getElementById('openaiKeyInput');
+const openaiKeyStatus = document.getElementById('openaiKeyStatus');
+const openaiClearKeyBtn = document.getElementById('openaiClearKeyBtn');
+const agentAModelSelect = document.getElementById('agentAModelSelect');
+const agentAThinkingSelect = document.getElementById('agentAThinkingSelect');
+const agentATemperatureInput = document.getElementById('agentATemperatureInput');
+const solverModelChecklist = document.getElementById('solverModelChecklist');
+const solverThinkingSelect = document.getElementById('solverThinkingSelect');
+const solverTemperatureInput = document.getElementById('solverTemperatureInput');
+const solverRepeatCountInput = document.getElementById('solverRepeatCountInput');
+const solverParallelismInput = document.getElementById('solverParallelismInput');
 
 const artifactGlossary = {
-  'spec.md': {
-    title: '후보 언어 개요 문서',
-    summary: '이 후보 언어의 핵심 내용을 사람이 읽기 쉬운 마크다운 문서로 정리한 파일이다.',
-    why: '후보의 수준, 부모, 변이 요약, 파이프라인 구조를 가장 빠르게 훑어볼 수 있는 입구다.',
-  },
-  'interpreter.ml': {
-    title: '실행 가능한 언어 정의',
-    summary: '후보 언어의 의미론을 실제로 실행 가능한 OCaml 인터프리터로 담아둔 파일이다.',
-    why: '자연어 설명이 아니라 이 인터프리터가 언어의 최종 기준점이며, Validator도 이 정의를 따른다.',
-  },
-  'language_spec.json': {
-    title: '후보 언어 구조 요약',
-    summary: '점수, 변이 요약, 의미론 모드, 파이프라인 설정 같은 상위 메타데이터를 모아둔 파일이다.',
-    why: '세부 프롬프트나 실행 결과를 보기 전에 후보의 성격을 빠르게 파악할 수 있다.',
-  },
-  'ast_schema.json': {
-    title: 'AST 스키마 계약',
-    summary: 'Agent B가 어떤 JSON 구조로 프로그램을 제출해야 하는지 정의한 계약서다.',
-    why: '이 파일이 있어야 Solver 출력이 기계적으로 파싱되고, Validator가 AST로 복원할 수 있다.',
-  },
-  'tasks.json': {
-    title: '벤치마크 태스크 묶음',
-    summary: '후보 언어로 풀어야 할 문제 목록과 기대 동작을 담은 파일이다.',
-    why: 'Agent B는 무엇을 풀지 여기서 읽고, Validator는 실제 실행 결과가 기대 동작과 맞는지 비교한다.',
-  },
-  'strategy_tree.json': {
-    title: '전략 탐색 트리',
-    summary: '이 후보가 어떤 전략 family와 leaf에서 나왔는지 구조적으로 기록한 파일이다.',
-    why: '현재 후보가 전체 탐색 공간 안에서 어디에 위치하는지 설명해준다.',
-  },
-  'agent_graph.json': {
-    title: '에이전트 그래프 데이터',
-    summary: '노드, 엣지, 상태, 좌표, 정보 흐름을 프론트엔드가 그릴 수 있도록 담은 데이터다.',
-    why: '그래프 UI는 이 파일을 읽어서 역할과 정보 흐름을 시각화한다.',
-  },
-  'program_attempts.json': {
-    title: 'Solver 제출 결과 묶음',
-    summary: 'Agent B가 만든 프로그램 시도들을 JSON AST 형태로 저장한 파일이다.',
-    why: 'Validator는 바로 이 파일을 읽어 AST로 복원하고 인터프리터에 넣어 실행한다.',
-  },
-  'validator_result.json': {
-    title: '결정론적 검증 결과',
-    summary: '파싱 성공 여부, 실행 성공 여부, 출력 일치 여부 등 Validator의 최종 판정을 담은 파일이다.',
-    why: '실험을 감상문이 아니라 재현 가능한 벤치마크 결과로 만드는 핵심 산출물이다.',
-  },
-  'candidate.json': {
-    title: '원본 후보 레코드',
-    summary: '데이터베이스에 저장된 후보의 원본 필드들을 그대로 덤프한 파일이다.',
-    why: '가공 전 메타데이터를 확인할 때 기준점이 된다.',
-  },
-  'analysis.json': {
-    title: '분석 요약',
-    summary: 'failure rate 같은 후처리 분석 결과를 저장한 파일이다.',
-    why: '후보 언어의 난이도와 특성을 실험 해석 관점에서 정리할 때 쓴다.',
-  },
-  'evaluations.json': {
-    title: '개별 평가 결과',
-    summary: '모델별·문제별 실행 결과를 한 줄씩 쌓아둔 평가 로그다.',
-    why: '어떤 모델이 어떤 문제에서 실패했는지 세부 수준으로 추적할 수 있다.',
-  },
-  'prompts/agentA_interpreter_builder.txt': {
-    title: 'Agent A 프롬프트',
-    summary: '인터프리터를 생성하거나 변이하라고 지시하는 프롬프트다.',
-    why: '언어 설계 공간을 어떤 방향으로 탐색할지 이 프롬프트가 정한다.',
-  },
-  'prompts/agentB_solver.txt': {
-    title: 'Agent B 프롬프트',
-    summary: '선택된 언어 의미론 아래에서 프로그램을 생성하라고 지시하는 프롬프트다.',
-    why: '언어 정의와 실제 Solver 모델 사이를 연결하는 직접적인 인터페이스다.',
-  },
+  'spec.md': { title: '후보 언어 개요 문서', summary: '이 후보 언어의 핵심 내용을 사람이 읽기 쉬운 마크다운으로 요약한 문서다.', why: '후보의 방향과 변이 의도를 가장 빠르게 파악할 수 있다.' },
+  'interpreter.ml': { title: '실행 가능한 언어 정의', summary: '후보 언어의 의미론을 직접 실행 가능한 OCaml 인터프리터로 담은 파일이다.', why: '이 파일이 언어의 최종 기준점이며, validator도 결국 이 정의를 따른다.' },
+  'language_spec.json': { title: '후보 언어 구조 요약', summary: '후보의 점수, 파이프라인 설정, solver bench 설정 같은 상위 메타데이터를 담는다.', why: '세부 실행 아티팩트로 들어가기 전에 후보의 성격을 빠르게 파악할 수 있다.' },
+  'ast_schema.json': { title: 'AST 스키마 계약', summary: 'Solver가 어떤 JSON AST 구조를 반환해야 하는지 정의한 계약서다.', why: 'JSON 출력이 기계적으로 파싱되고 validator가 AST로 복원될 수 있게 한다.' },
+  'tasks.json': { title: '벤치마크 태스크 묶음', summary: '각 문제의 프롬프트, 기대 동작, 테스트 케이스를 정의한다.', why: '모델이 무엇을 풀어야 하는지와 validator가 무엇을 비교해야 하는지를 동시에 결정한다.' },
+  'strategy_tree.json': { title: '전략 탐색 트리', summary: '이 candidate가 전체 탐색 트리에서 어느 family/leaf에 속하는지 담는다.', why: '현재 후보가 전체 탐색의 어느 지점에서 왔는지 설명한다.' },
+  'agent_graph.json': { title: '에이전트 그래프 데이터', summary: '노드, 엣지, 상태, 정보 흐름을 프론트엔드가 그릴 수 있도록 구조화한 데이터다.', why: '그래프 UI는 이 파일을 기반으로 역할/정보 흐름을 시각화한다.' },
+  'program_attempts.json': { title: 'Solver 제출 결과 묶음', summary: '모델별·문제별·반복별 JSON AST 제출 결과를 저장한다.', why: '이 파일이 실제 validator 입력이며, 모델이 낸 프로그램 자체를 보여준다.' },
+  'validator_result.json': { title: '실행 기반 검증 결과', summary: 'JSON AST 파싱, OCaml AST 변환, interpreter 실행, 테스트케이스 비교 결과를 담는다.', why: '실험을 실제 실행 기반 벤치마크로 만드는 핵심 산출물이다.' },
+  'candidate.json': { title: '원본 후보 레코드', summary: '후보의 원본 DB 레코드를 그대로 덤프한 파일이다.', why: '가공 전 메타데이터를 확인하는 기준점이 된다.' },
+  'analysis.json': { title: '후처리 분석', summary: 'failure rate, hardest model, prior boundary 같은 후처리 분석 결과를 담는다.', why: '후보의 난이도와 특성을 정리하는 데 필요하다.' },
+  'evaluations.json': { title: '개별 평가 로그', summary: '각 모델/문제/반복 시도에 대한 개별 결과를 쌓아둔 로그다.', why: '어느 모델이 어떤 문제에서 몇 번 성공했는지 세부 추적이 가능하다.' },
+  'prompts/agentA_interpreter_builder.txt': { title: 'Agent A 프롬프트', summary: '인터프리터를 생성하거나 변이하라고 지시하는 프롬프트다.', why: '언어 설계 공간을 어떤 방향으로 탐색할지 결정한다.' },
+  'prompts/agentB_solver.txt': { title: 'Agent B / Solver Bench 프롬프트', summary: '모델 풀 전체가 candidate language를 어떻게 풀어야 하는지 설명하는 프롬프트다.', why: '실제 solver 벤치가 interpreter와 task를 어떻게 읽는지 보여준다.' },
 };
+
+const metricGuideEntries = [
+  ['Parent', '이 candidate가 어떤 부모 후보에서 파생됐는지 나타낸다.'],
+  ['Similarity', 'Python-near 정도. 높을수록 표면 구조가 Python과 비슷하다.'],
+  ['Conflict', 'Python prior와 충돌하는 정도. 높을수록 기존 습관을 깨뜨린다.'],
+  ['Solvable', '규칙을 따르면 실제로 풀 수 있는지에 대한 추정치다.'],
+  ['Novelty', '기존 후보와 얼마나 다른지에 대한 추정치다.'],
+  ['Task Bank', '현재 후보를 평가할 문제 세트 목록이다.'],
+  ['Agent A 설정', '언어를 생성/변이하는 모델과 파라미터다.'],
+  ['Solver Bench 설정', '평가할 모델 풀, 반복 횟수, 병렬도, thinking, temperature를 의미한다.'],
+  ['모델별 Pass', '각 모델이 모든 반복 시도 중 몇 번 성공했는지 / 전체 시도 수를 뜻한다.'],
+  ['Failure rate', '전체 평가 중 실패 비율이다. 높을수록 어려운 언어다.'],
+];
 
 async function getJson(url, options = {}) {
   const res = await fetch(url, options);
@@ -156,19 +107,20 @@ function percent(value, digits = 0) {
 }
 
 function thinkingLabel(value) {
-  const map = {
-    off: 'off',
-    low: 'low',
-    medium: 'medium',
-    high: 'high',
-  };
-  return map[value] || value || 'medium';
+  return value || 'medium';
 }
 
-function keySourceLabel(status) {
-  if (!status?.configured) return '설정 안 됨';
-  if (status.source === 'legacy_shared') return `공통 키 상속 중 (${status.masked})`;
-  return `개별 키 설정됨 (${status.masked})`;
+function codeBlock(text = '') {
+  return `<pre class="code-block">${escapeHtml(text)}</pre>`;
+}
+
+function rawDetails(title, text = '') {
+  return `
+    <details class="raw-details">
+      <summary>${escapeHtml(title)}</summary>
+      ${codeBlock(text)}
+    </details>
+  `;
 }
 
 function pill(text, tone = '') {
@@ -182,19 +134,6 @@ function metricCard(label, value, sub = '') {
       <div class="value">${escapeHtml(String(value))}</div>
       <div class="sub">${escapeHtml(sub)}</div>
     </div>
-  `;
-}
-
-function codeBlock(text = '') {
-  return `<pre class="code-block">${escapeHtml(text)}</pre>`;
-}
-
-function rawDetails(title, text = '') {
-  return `
-    <details class="raw-details">
-      <summary>${escapeHtml(title)}</summary>
-      ${codeBlock(text)}
-    </details>
   `;
 }
 
@@ -236,42 +175,35 @@ function glossaryHtml(path) {
   return inspectorCard(entry.title, `<p>${escapeHtml(entry.summary)}<br><br>${escapeHtml(entry.why)}</p>`);
 }
 
-function artifactGuideCard(detail) {
-  const files = Object.keys(detail?.artifacts?.files || {});
-  if (!files.length) return '';
-  const rows = files.map((path) => {
-    const entry = artifactGlossary[path] || {
-      title: '보조 아티팩트',
-      summary: '실행 과정에서 생성된 추가 산출물이다.',
-    };
-    return `
-      <div class="artifact-row">
-        <div class="artifact-path">${escapeHtml(path)}</div>
-        <div class="artifact-title">${escapeHtml(entry.title)}</div>
-        <div class="artifact-copy">${escapeHtml(entry.summary)}</div>
-      </div>
-    `;
-  }).join('');
-  return inspectorCard('아티팩트 전체 설명', `<div class="artifact-guide">${rows}</div>`);
-}
-
 function getArtifact(detail, path) {
   return detail?.artifacts?.files?.[path] || '';
 }
 
-function settingsPreviewText(agents) {
-  if (!agents) return 'A/B 설정 불러오는 중…';
-  const a = agents.agent_a;
-  const b = agents.agent_b;
-  return [
-    `A · ${a.model} · ${thinkingLabel(a.thinking)} · temp ${a.temperature}`,
-    `B · ${b.model} · ${thinkingLabel(b.thinking)} · temp ${b.temperature}`,
-  ].join('  |  ');
+function renderMetricGuide() {
+  metricGuide.innerHTML = metricGuideEntries.map(([title, copy]) => `
+    <div class="metric-guide-card">
+      <div class="metric-guide-title">${escapeHtml(title)}</div>
+      <div class="metric-guide-copy">${escapeHtml(copy)}</div>
+    </div>
+  `).join('');
 }
 
-function configHintText(agents) {
-  if (!agents) return '설정 불러오는 중…';
-  return `A: ${agents.agent_a.model} / ${thinkingLabel(agents.agent_a.thinking)} / ${agents.agent_a.temperature} · B: ${agents.agent_b.model} / ${thinkingLabel(agents.agent_b.thinking)} / ${agents.agent_b.temperature}`;
+function keyStatusText(status) {
+  if (!status?.configured) return '설정 안 됨';
+  return `설정됨 (${status.masked})`;
+}
+
+function settingsPreviewText(config) {
+  if (!config) return '설정을 불러오는 중…';
+  const agentA = config.agent_a;
+  const bench = config.solver_bench;
+  return `A · ${agentA.model} · ${thinkingLabel(agentA.thinking)} · temp ${agentA.temperature}  |  Bench · ${bench.enabled_models.length} models · x${bench.repeat_count} · parallel ${bench.parallelism}`;
+}
+
+function configHintText(config) {
+  if (!config) return '설정 불러오는 중…';
+  const bench = config.solver_bench;
+  return `A: ${config.agent_a.model} / ${thinkingLabel(config.agent_a.thinking)} / ${config.agent_a.temperature} · Bench: ${bench.enabled_models.length} models × ${bench.repeat_count}회 · parallel ${bench.parallelism}`;
 }
 
 function setActionState(button, { disabled = false, active = false } = {}) {
@@ -283,7 +215,6 @@ function renderActionButtons(loopState = {}) {
   const status = loopState.status || 'idle';
   const running = status === 'running';
   const paused = status === 'paused';
-
   setActionState(openSettingsBtn, { disabled: false, active: false });
   setActionState(startBtn, { disabled: running, active: running });
   setActionState(pauseBtn, { disabled: !running, active: paused });
@@ -291,40 +222,36 @@ function renderActionButtons(loopState = {}) {
   setActionState(resetBtn, { disabled: false, active: false });
 }
 
-function populateConfigControls(config) {
-  if (!config) return;
-  const models = config.openai_models || [];
-  const thinkingOptions = config.thinking_options || [];
+function populateConfigControls(payload) {
+  if (!payload) return;
+  const config = payload.config;
+  const models = payload.openai_models || [];
+  const thinkingOptions = payload.thinking_options || [];
 
-  Object.entries(agentControls).forEach(([agentKey, controls]) => {
-    const agent = config.agents?.[agentKey];
-    if (!agent) return;
-    controls.model.innerHTML = models.map((name) => `<option value="${name}">${name}</option>`).join('');
-    controls.model.value = agent.model;
-    controls.thinking.innerHTML = thinkingOptions.map((value) => `<option value="${value}">${thinkingLabel(value)}</option>`).join('');
-    controls.thinking.value = agent.thinking;
-    controls.temperature.value = agent.temperature;
-    controls.apiKey.value = '';
-    controls.keyStatus.textContent = keySourceLabel(agent.api_key);
-  });
+  agentAModelSelect.innerHTML = models.map((name) => `<option value="${name}">${name}</option>`).join('');
+  agentAModelSelect.value = config.agent_a.model;
+  agentAThinkingSelect.innerHTML = thinkingOptions.map((value) => `<option value="${value}">${thinkingLabel(value)}</option>`).join('');
+  agentAThinkingSelect.value = config.agent_a.thinking;
+  agentATemperatureInput.value = config.agent_a.temperature;
 
-  settingsPreview.textContent = settingsPreviewText(config.agents);
-  configHint.textContent = configHintText(config.agents);
-}
+  solverThinkingSelect.innerHTML = thinkingOptions.map((value) => `<option value="${value}">${thinkingLabel(value)}</option>`).join('');
+  solverThinkingSelect.value = config.solver_bench.thinking;
+  solverTemperatureInput.value = config.solver_bench.temperature;
+  solverRepeatCountInput.value = config.solver_bench.repeat_count;
+  solverParallelismInput.value = config.solver_bench.parallelism;
 
-function normalizeAgentSettingsFromCandidate(meta = {}) {
-  return {
-    agent_a: meta.agent_a_settings || {
-      model: meta.agent_a_model || 'gpt-5.4',
-      thinking: meta.agent_a_thinking || 'high',
-      temperature: meta.agent_a_temperature ?? 0.7,
-    },
-    agent_b: meta.agent_b_settings || {
-      model: meta.agent_b_model || 'gpt-5.4',
-      thinking: meta.agent_b_thinking || 'medium',
-      temperature: meta.agent_b_temperature ?? 0.2,
-    },
-  };
+  const enabled = new Set(config.solver_bench.enabled_models || []);
+  solverModelChecklist.innerHTML = models.map((name) => `
+    <label class="model-check-item">
+      <input type="checkbox" value="${name}" ${enabled.has(name) ? 'checked' : ''} />
+      <span>${name}</span>
+    </label>
+  `).join('');
+
+  openaiKeyInput.value = '';
+  openaiKeyStatus.textContent = keyStatusText(config.providers?.openai?.api_key);
+  settingsPreview.textContent = settingsPreviewText(config);
+  configHint.textContent = configHintText(config);
 }
 
 async function loadConfig() {
@@ -343,19 +270,30 @@ function closeSettingsModal() {
   settingsModal.setAttribute('aria-hidden', 'true');
 }
 
-function buildAgentsPayload() {
-  const agents = {};
-  Object.entries(agentControls).forEach(([agentKey, controls]) => {
-    const payload = {
-      model: controls.model.value,
-      thinking: controls.thinking.value,
-      temperature: Number(controls.temperature.value),
-    };
-    const keyValue = controls.apiKey.value.trim();
-    if (keyValue) payload.api_key = keyValue;
-    agents[agentKey] = payload;
-  });
-  return { agents };
+function selectedSolverModels() {
+  return [...solverModelChecklist.querySelectorAll('input[type="checkbox"]:checked')].map((el) => el.value);
+}
+
+function buildConfigPayload() {
+  const payload = {
+    agent_a: {
+      model: agentAModelSelect.value,
+      thinking: agentAThinkingSelect.value,
+      temperature: Number(agentATemperatureInput.value),
+    },
+    solver_bench: {
+      enabled_models: selectedSolverModels(),
+      thinking: solverThinkingSelect.value,
+      temperature: Number(solverTemperatureInput.value),
+      repeat_count: Number(solverRepeatCountInput.value),
+      parallelism: Number(solverParallelismInput.value),
+    },
+  };
+  const key = openaiKeyInput.value.trim();
+  if (key) {
+    payload.providers = { openai: { api_key: key } };
+  }
+  return payload;
 }
 
 async function updateConfig(payload) {
@@ -368,13 +306,29 @@ async function updateConfig(payload) {
   populateConfigControls(data);
   await refreshOverview();
   await refreshCandidates({ autoSelect: false });
-  if (state.selectedId) {
-    await selectCandidate(state.selectedId, { updateInspector: false });
-  }
+  await refreshSelectedIfNeeded();
 }
 
-async function clearAgentKey(agentKey) {
-  await updateConfig({ agents: { [agentKey]: { clear_api_key: true } } });
+async function clearOpenAIKey() {
+  await updateConfig({ providers: { openai: { clear_api_key: true } } });
+}
+
+function normalizedAgentSettingsFromCandidate(meta = {}) {
+  return {
+    agent_a: meta.agent_a_settings || {
+      model: meta.agent_a_model || 'gpt-5.4',
+      thinking: meta.agent_a_thinking || 'high',
+      temperature: meta.agent_a_temperature ?? 0.7,
+    },
+    solver_bench: meta.solver_settings || {
+      enabled_models: [meta.agent_b_model || 'gpt-5.4'],
+      thinking: meta.agent_b_thinking || 'medium',
+      temperature: meta.agent_b_temperature ?? 0.2,
+      repeat_count: 1,
+      parallelism: 1,
+      provider: 'openai',
+    },
+  };
 }
 
 async function refreshOverview() {
@@ -382,42 +336,41 @@ async function refreshOverview() {
   state.overview = data;
   const loopState = data.state || {};
   const hardest = data.hardest || {};
-  const agents = state.config?.agents || data.agents || null;
+  const config = state.config?.config;
 
   summaryBar.innerHTML = [
     metricCard('루프 상태', (loopState.status || 'idle').toUpperCase(), loopState.note || '실행 대기 중'),
     metricCard('Iteration', loopState.iteration ?? 0, '완료된 라운드 수'),
     metricCard('후보 수', data.stats.total_candidates, '생성된 candidate'),
     metricCard('Archive', data.stats.archived_candidates, 'hard-but-valid'),
-    metricCard('Agent A', agents?.agent_a?.model || '—', `${thinkingLabel(agents?.agent_a?.thinking)} · temp ${agents?.agent_a?.temperature ?? '—'}`),
-    metricCard('Agent B', agents?.agent_b?.model || '—', `${thinkingLabel(agents?.agent_b?.thinking)} · temp ${agents?.agent_b?.temperature ?? '—'}`),
+    metricCard('총 평가 수', data.stats.total_evaluations, '모델 × 문제 × 반복'),
+    metricCard('Solver Bench', config ? `${config.solver_bench.enabled_models.length} models` : '—', config ? `x${config.solver_bench.repeat_count} · parallel ${config.solver_bench.parallelism}` : '설정 로딩 중'),
     metricCard('현재 hardest', hardest.name || '—', hardest.failure_rate != null ? `failure ${percent(hardest.failure_rate)}` : '아직 없음'),
   ].join('');
 
   renderActionButtons(loopState);
+  renderStrategyTree();
   renderBenchmark();
 }
 
 function renderBenchmark() {
   const benchmark = state.overview?.benchmark || { models: [], tasks: [], levels: [] };
 
-  const makeSection = (title, rows, titleField, valueField, prefix, fallback) => {
-    if (!rows?.length) {
-      return `<div class="summary-card"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(fallback)}</p></div>`;
-    }
+  const makeSection = (title, rows, titleField, valueField, fallback) => {
+    if (!rows?.length) return `<div class="summary-card"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(fallback)}</p></div>`;
     return `
       <div class="summary-card">
         <h3>${escapeHtml(title)}</h3>
         <div class="summary-list">
-          ${rows.slice(0, 4).map((row) => `
+          ${rows.slice(0, 5).map((row) => `
             <div class="summary-row">
               <div class="summary-row-head">
                 <span>${escapeHtml(row[titleField])}</span>
-                <strong>${escapeHtml(prefix)} ${escapeHtml(percent(row[valueField]))}</strong>
+                <strong>${percent(row[valueField])}</strong>
               </div>
               <div class="pills">
-                ${'n' in row ? pill(`${row.n} samples`) : ''}
-                ${'archived_n' in row ? pill(`${row.archived_n} archived`) : ''}
+                ${row.success_count != null ? pill(`${row.success_count}/${row.n} success`) : ''}
+                ${row.archived_n != null ? pill(`${row.archived_n} archived`) : ''}
               </div>
             </div>
           `).join('')}
@@ -427,9 +380,9 @@ function renderBenchmark() {
   };
 
   benchmarkContent.innerHTML = [
-    makeSection('모델별', benchmark.models, 'model_name', 'pass_rate', 'Pass', '아직 모델 결과가 없음'),
-    makeSection('문제별', benchmark.tasks, 'task_name', 'pass_rate', 'Pass', '아직 태스크 결과가 없음'),
-    makeSection('레벨별', benchmark.levels, 'level', 'avg_failure', 'Failure', '아직 레벨 결과가 없음'),
+    makeSection('모델별 성공률', benchmark.models, 'model_name', 'pass_rate', '아직 모델 결과가 없음'),
+    makeSection('문제별 성공률', benchmark.tasks, 'task_name', 'pass_rate', '아직 태스크 결과가 없음'),
+    makeSection('레벨별 평균 실패율', benchmark.levels, 'level', 'avg_failure', '아직 레벨 결과가 없음'),
   ].join('');
 }
 
@@ -439,9 +392,12 @@ function renderFocusCard() {
     focusCard.innerHTML = panelEmpty('선택된 candidate가 없음', '왼쪽 후보 목록에서 하나를 고르면 여기에서 핵심 상태를 바로 볼 수 있다.');
     return;
   }
-
   const meta = detail.metadata || {};
-  const agentSettings = normalizeAgentSettingsFromCandidate(meta);
+  const settings = normalizedAgentSettingsFromCandidate(meta);
+  const totalExpected = settings.solver_bench.enabled_models.length * (meta.task_bank?.length || 0) * settings.solver_bench.repeat_count;
+  const completed = detail.evaluations?.length || 0;
+  const progressText = totalExpected ? `${completed}/${totalExpected}` : `${completed}`;
+
   focusCard.innerHTML = `
     <div class="focus-hero">
       <div>
@@ -453,7 +409,7 @@ function renderFocusCard() {
         ${pill(detail.level, 'tone-neutral')}
         ${pill(`failure ${percent(detail.failure_rate)}`, 'tone-accent')}
         ${pill(meta.strategy_leaf || 'strategy n/a', 'tone-purple')}
-        ${pill(detail.archived ? 'archived' : (detail.status || 'generated'), detail.archived ? 'tone-green' : 'tone-neutral')}
+        ${pill(detail.status || 'generated', detail.archived ? 'tone-green' : 'tone-neutral')}
       </div>
     </div>
     <div class="focus-grid">
@@ -462,13 +418,14 @@ function renderFocusCard() {
       ${kv('Conflict', detail.conflict_score ?? '—')}
       ${kv('Solvable', detail.solvable_score ?? '—')}
       ${kv('Novelty', detail.novelty_score ?? '—')}
-      ${kv('Task bank', Array.isArray(meta.task_bank) ? meta.task_bank.join(', ') : '—')}
-      ${kv('Agent A 모델', agentSettings.agent_a.model)}
-      ${kv('Agent A thinking', thinkingLabel(agentSettings.agent_a.thinking))}
-      ${kv('Agent A temp', agentSettings.agent_a.temperature)}
-      ${kv('Agent B 모델', agentSettings.agent_b.model)}
-      ${kv('Agent B thinking', thinkingLabel(agentSettings.agent_b.thinking))}
-      ${kv('Agent B temp', agentSettings.agent_b.temperature)}
+      ${kv('Task Bank', Array.isArray(meta.task_bank) ? meta.task_bank.join(', ') : '—')}
+      ${kv('Agent A 모델', settings.agent_a.model)}
+      ${kv('Agent A thinking', thinkingLabel(settings.agent_a.thinking))}
+      ${kv('Agent A temp', settings.agent_a.temperature)}
+      ${kv('Bench models', settings.solver_bench.enabled_models.length)}
+      ${kv('반복 횟수', settings.solver_bench.repeat_count)}
+      ${kv('병렬 요청', settings.solver_bench.parallelism)}
+      ${kv('진행률', progressText)}
     </div>
   `;
 }
@@ -477,18 +434,12 @@ function filteredCandidates() {
   const q = state.search.trim().toLowerCase();
   return state.candidates.filter((candidate) => {
     if (state.archivedOnly && !candidate.archived) return false;
-    if (!q) return true;
     const meta = candidate.metadata || {};
-    const hay = [
-      candidate.name,
-      candidate.level,
-      candidate.mutation_summary,
-      meta.strategy_family || '',
-      meta.strategy_leaf || '',
-      meta.agent_a_model || '',
-      meta.agent_b_model || '',
-      candidate.status || '',
-    ].join(' ').toLowerCase();
+    if (state.treeFilter && state.treeFilter !== 'root') {
+      if (![meta.strategy_family, meta.strategy_leaf].includes(state.treeFilter)) return false;
+    }
+    if (!q) return true;
+    const hay = [candidate.name, candidate.level, candidate.mutation_summary, meta.strategy_family || '', meta.strategy_leaf || '', candidate.status || ''].join(' ').toLowerCase();
     return hay.includes(q);
   });
 }
@@ -496,6 +447,7 @@ function filteredCandidates() {
 function candidateRow(candidate) {
   const active = candidate.id === state.selectedId ? 'active' : '';
   const meta = candidate.metadata || {};
+  const solverSettings = normalizedAgentSettingsFromCandidate(meta).solver_bench;
   return `
     <div class="candidate-item ${active}" data-id="${candidate.id}">
       <div class="candidate-topline">
@@ -506,8 +458,8 @@ function candidateRow(candidate) {
       <div class="pills">
         ${pill(`failure ${percent(candidate.failure_rate)}`)}
         ${pill(meta.strategy_leaf || 'strategy n/a')}
-        ${pill(`A ${meta.agent_a_model || '—'}`)}
-        ${pill(`B ${meta.agent_b_model || '—'}`)}
+        ${pill(`${solverSettings.enabled_models.length} models`)}
+        ${pill(`x${solverSettings.repeat_count}`)}
       </div>
     </div>
   `;
@@ -520,15 +472,14 @@ function renderCandidateList() {
     return;
   }
   candidateList.innerHTML = items.map(candidateRow).join('');
-  candidateList.querySelectorAll('.candidate-item').forEach((el) => {
-    el.addEventListener('click', () => selectCandidate(el.dataset.id));
-  });
+  candidateList.querySelectorAll('.candidate-item').forEach((el) => el.addEventListener('click', () => selectCandidate(el.dataset.id)));
 }
 
 async function refreshCandidates({ autoSelect = true } = {}) {
-  const data = await getJson('/api/candidates?limit=80');
+  const data = await getJson('/api/candidates?limit=500');
   state.candidates = data.items;
   renderCandidateList();
+  renderStrategyTree();
 
   if (state.selectedId) {
     const stillExists = state.candidates.some((item) => item.id === state.selectedId);
@@ -536,9 +487,7 @@ async function refreshCandidates({ autoSelect = true } = {}) {
   }
 
   const items = filteredCandidates();
-  if (autoSelect && !state.selectedId && items[0]) {
-    await selectCandidate(items[0].id, { updateInspector: true });
-  }
+  if (autoSelect && !state.selectedId && items[0]) await selectCandidate(items[0].id, { updateInspector: true });
 }
 
 function clearSelection() {
@@ -549,47 +498,55 @@ function clearSelection() {
   state.selectedGraphEdge = null;
   selectedHint.textContent = '후보를 선택해줘';
   renderFocusCard();
-  strategyTreeStage.innerHTML = panelEmpty('전략 트리가 비어 있음', '후보를 선택하면 어떤 전략 family와 leaf에서 나왔는지 여기에 표시된다.');
-  graphStage.innerHTML = panelEmpty('실행 그래프가 비어 있음', '후보를 선택하면 Agent A → Agent B → Validator 흐름이 여기에 나타난다.');
+  renderSolverBenchMonitor();
+  renderStrategyTree();
+  graphStage.innerHTML = panelEmpty('실행 그래프가 비어 있음', '후보를 선택하면 Agent A → Solver Bench → Validator 흐름이 나타난다.');
   inspectorContent.className = 'inspector empty';
   inspectorContent.innerHTML = emptyInspectorHtml();
+}
+
+function selectedPathSet() {
+  const meta = state.selectedCandidate?.metadata || {};
+  return new Set(['root', meta.strategy_family, meta.strategy_leaf].filter(Boolean));
 }
 
 function renderTreeNode(nodeId, tree) {
   const node = tree.nodes?.[nodeId];
   if (!node) return '';
   const children = (tree.edges || []).filter(([src]) => src === nodeId).map(([, dst]) => dst);
-  const activeClass = state.selectedTreeNode === nodeId ? 'active' : '';
+  const selected = selectedPathSet().has(nodeId);
+  const activeFilter = state.treeFilter === nodeId;
   return `
     <li>
-      <div class="tree-node ${node.kind || ''} ${node.status || ''} ${activeClass}" data-node-id="${nodeId}">
+      <div class="tree-node ${node.kind || ''} ${selected ? 'selected' : ''} ${activeFilter ? 'active' : ''}" data-node-id="${nodeId}">
         <div class="tree-title">${escapeHtml(node.label || nodeId)}</div>
-        <div class="tree-meta">${escapeHtml(node.kind || '')}${node.score != null ? ` · score ${node.score}` : ''}${node.note ? ` · ${escapeHtml(node.note)}` : ''}</div>
+        <div class="tree-meta">${node.count ?? 0} candidates · archived ${node.archived_count ?? 0} · avg failure ${percent(node.avg_failure || 0)}</div>
       </div>
       ${children.length ? `<ul>${children.map((child) => renderTreeNode(child, tree)).join('')}</ul>` : ''}
     </li>
   `;
 }
 
-function renderStrategyTree(tree) {
+function renderStrategyTree() {
+  const tree = state.overview?.strategy_tree;
   if (!tree?.nodes || !Object.keys(tree.nodes).length) {
-    strategyTreeStage.innerHTML = panelEmpty('전략 데이터가 없음', '이 candidate의 전략 트리 정보가 아직 생성되지 않았다.');
+    strategyTreeStage.innerHTML = panelEmpty('전략 트리가 비어 있음', '아직 candidate가 없어서 root만 존재한다.');
     return;
   }
-
   strategyTreeStage.innerHTML = `<ul class="tree-list">${renderTreeNode('root', tree)}</ul>`;
   strategyTreeStage.querySelectorAll('[data-node-id]').forEach((el) => {
     el.addEventListener('click', (evt) => {
       evt.stopPropagation();
       const nodeId = el.dataset.nodeId;
-      const node = tree.nodes?.[nodeId] || {};
       state.selectedTreeNode = nodeId;
-      renderStrategyTree(tree);
-      if (node.kind === 'family' || node.kind === 'strategy') {
-        state.search = nodeId;
-        searchInput.value = nodeId;
-        renderCandidateList();
+      state.treeFilter = nodeId;
+      if (nodeId === 'root') {
+        state.search = '';
+        searchInput.value = '';
       }
+      renderCandidateList();
+      renderStrategyTree();
+      const node = tree.nodes?.[nodeId] || {};
       showTreeInspector(nodeId, node, tree);
     });
   });
@@ -604,7 +561,6 @@ function renderAgentGraph(graph) {
     graphStage.innerHTML = panelEmpty('그래프 데이터가 없음', '후보가 생성되면 에이전트와 아티팩트 흐름이 여기에 표시된다.');
     return;
   }
-
   const width = 1560;
   const height = 420;
   const boxW = 174;
@@ -659,29 +615,110 @@ function renderAgentGraph(graph) {
     </svg>
   `;
 
-  graphStage.querySelectorAll('.graph-node-group').forEach((el) => {
-    el.addEventListener('click', () => {
-      state.selectedGraphNode = el.dataset.nodeId;
-      state.selectedGraphEdge = null;
-      renderAgentGraph(graph);
-      showNodeInspector(byId[el.dataset.nodeId]);
-    });
+  graphStage.querySelectorAll('.graph-node-group').forEach((el) => el.addEventListener('click', () => {
+    state.selectedGraphNode = el.dataset.nodeId;
+    state.selectedGraphEdge = null;
+    renderAgentGraph(graph);
+    showNodeInspector(byId[el.dataset.nodeId]);
+  }));
+  graphStage.querySelectorAll('.graph-edge-group').forEach((el) => el.addEventListener('click', () => {
+    state.selectedGraphEdge = el.dataset.edgeId;
+    state.selectedGraphNode = null;
+    renderAgentGraph(graph);
+    const edge = (graph.edges || []).find((item) => item.id === el.dataset.edgeId);
+    showEdgeInspector(edge);
+  }));
+}
+
+function renderSolverBenchMonitor() {
+  const detail = state.selectedCandidate;
+  if (!detail) {
+    solverBenchMonitor.innerHTML = panelEmpty('선택된 candidate가 없음', '후보를 선택하면 모델별·문제별 성공 횟수를 여기에서 모니터링할 수 있다.');
+    return;
+  }
+
+  const meta = detail.metadata || {};
+  const settings = normalizedAgentSettingsFromCandidate(meta).solver_bench;
+  const taskBank = meta.task_bank || [];
+  const models = settings.enabled_models || [];
+  const repeatCount = Number(settings.repeat_count || 1);
+  const evaluations = detail.evaluations || [];
+  const expectedTotal = models.length * taskBank.length * repeatCount;
+  const completed = evaluations.length;
+  const passed = evaluations.filter((row) => row.success).length;
+
+  const cellMap = new Map();
+  evaluations.forEach((row) => {
+    const key = `${row.model_name}::${row.task_name}`;
+    if (!cellMap.has(key)) cellMap.set(key, { success: 0, total: 0 });
+    const bucket = cellMap.get(key);
+    bucket.total += 1;
+    if (row.success) bucket.success += 1;
   });
 
-  graphStage.querySelectorAll('.graph-edge-group').forEach((el) => {
-    el.addEventListener('click', () => {
-      state.selectedGraphEdge = el.dataset.edgeId;
-      state.selectedGraphNode = null;
-      renderAgentGraph(graph);
-      const edge = (graph.edges || []).find((item) => item.id === el.dataset.edgeId);
-      showEdgeInspector(edge);
-    });
-  });
+  const table = `
+    <table class="solver-monitor-table">
+      <thead>
+        <tr>
+          <th>Model</th>
+          ${taskBank.map((task) => `<th>${escapeHtml(task)}</th>`).join('')}
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${models.map((modelName) => {
+          let modelSuccess = 0;
+          let modelTotal = 0;
+          const taskCells = taskBank.map((task) => {
+            const bucket = cellMap.get(`${modelName}::${task}`) || { success: 0, total: 0 };
+            modelSuccess += bucket.success;
+            modelTotal += bucket.total;
+            const tone = bucket.total === 0 ? 'pending' : (bucket.success === bucket.total ? 'full' : (bucket.success > 0 ? 'partial' : 'empty'));
+            return `<td><div class="solver-cell ${tone}"><strong>${bucket.success}/${repeatCount}</strong><span>${bucket.total}/${repeatCount} 완료</span></div></td>`;
+          }).join('');
+          return `
+            <tr>
+              <th>${escapeHtml(modelName)}</th>
+              ${taskCells}
+              <td><div class="solver-cell total"><strong>${modelSuccess}/${taskBank.length * repeatCount}</strong><span>${percent(modelTotal ? modelSuccess / modelTotal : 0)}</span></div></td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+
+  solverBenchMonitor.innerHTML = `
+    <div class="solver-monitor-summary">
+      ${kv('진행률', `${completed}/${expectedTotal}`)}
+      ${kv('성공 수', `${passed}/${completed || expectedTotal || 0}`)}
+      ${kv('반복 횟수', repeatCount)}
+      ${kv('병렬 요청', settings.parallelism)}
+      ${kv('Thinking', thinkingLabel(settings.thinking))}
+      ${kv('Temperature', settings.temperature)}
+    </div>
+    ${table}
+  `;
+}
+
+function artifactGuideCard(detail) {
+  const files = Object.keys(detail?.artifacts?.files || {});
+  if (!files.length) return '';
+  return inspectorCard('아티팩트 전체 설명', `<div class="artifact-guide">${files.map((path) => {
+    const entry = artifactGlossary[path] || { title: '보조 아티팩트', summary: '실행 과정에서 생성된 추가 산출물이다.' };
+    return `
+      <div class="artifact-row">
+        <div class="artifact-path">${escapeHtml(path)}</div>
+        <div class="artifact-title">${escapeHtml(entry.title)}</div>
+        <div class="artifact-copy">${escapeHtml(entry.summary)}</div>
+      </div>
+    `;
+  }).join('')}</div>`);
 }
 
 function showCandidateInspector(detail) {
   const meta = detail.metadata || {};
-  const agentSettings = normalizeAgentSettingsFromCandidate(meta);
+  const settings = normalizedAgentSettingsFromCandidate(meta);
   inspectorContent.classList.remove('empty');
   inspectorContent.innerHTML = `
     <div class="inspector-section">
@@ -690,23 +727,24 @@ function showCandidateInspector(detail) {
         <div class="pills">
           ${pill(`failure ${percent(detail.failure_rate)}`, 'tone-accent')}
           ${pill(meta.strategy_leaf || 'strategy n/a', 'tone-purple')}
-          ${pill(detail.archived ? 'archived' : (detail.status || 'generated'), detail.archived ? 'tone-green' : '')}
+          ${pill(detail.status || 'generated', detail.archived ? 'tone-green' : 'tone-neutral')}
         </div>
       `)}
-      ${inspectorCard('에이전트 설정', `
+      ${inspectorCard('지표 해석', `
         <div class="inspector-grid">
-          ${kv('Agent A 모델', agentSettings.agent_a.model)}
-          ${kv('Agent A thinking', thinkingLabel(agentSettings.agent_a.thinking))}
-          ${kv('Agent A temp', agentSettings.agent_a.temperature)}
-          ${kv('Agent B 모델', agentSettings.agent_b.model)}
-          ${kv('Agent B thinking', thinkingLabel(agentSettings.agent_b.thinking))}
-          ${kv('Agent B temp', agentSettings.agent_b.temperature)}
+          ${kv('Similarity', 'Python 표면과의 유사도')}
+          ${kv('Conflict', 'Python prior와의 충돌 강도')}
+          ${kv('Solvable', '규칙을 따르면 풀 수 있는 정도')}
+          ${kv('Novelty', '기존 후보 대비 새로움')}
         </div>
       `)}
-      ${inspectorCard('핵심 파일 두 개', `
+      ${inspectorCard('Solver Bench 설정', `
         <div class="inspector-grid">
-          ${kv('ast_schema.json', 'Solver가 따라야 하는 JSON AST 형식 계약')}
-          ${kv('tasks.json', '문제 목록과 기대 동작 정의')}
+          ${kv('Enabled models', settings.solver_bench.enabled_models.join(', '))}
+          ${kv('Repeat count', settings.solver_bench.repeat_count)}
+          ${kv('Parallelism', settings.solver_bench.parallelism)}
+          ${kv('Thinking', thinkingLabel(settings.solver_bench.thinking))}
+          ${kv('Temperature', settings.solver_bench.temperature)}
         </div>
       `)}
       ${artifactGuideCard(detail)}
@@ -717,13 +755,12 @@ function showCandidateInspector(detail) {
 }
 
 function showTreeInspector(nodeId, node, tree) {
-  const detail = state.selectedCandidate;
   inspectorContent.classList.remove('empty');
   inspectorContent.innerHTML = `
     <div class="inspector-section">
-      ${inspectorCard('전략 노드', `<p><strong>${escapeHtml(node.label || nodeId)}</strong><br>kind: ${escapeHtml(node.kind || '')}<br>status: ${escapeHtml(node.status || '')}${node.score != null ? `<br>score: ${node.score}` : ''}${node.note ? `<br>${escapeHtml(node.note)}` : ''}</p>`)}
-      ${inspectorCard('선택된 경로', `<p>${(tree.selected_path || []).map((item) => escapeHtml(item)).join(' → ')}</p>`)}
-      ${detail ? inspectorCard('현재 후보의 전략 메타데이터', rawDetails('metadata raw 보기', JSON.stringify({ strategy_family: detail.metadata?.strategy_family, strategy_leaf: detail.metadata?.strategy_leaf }, null, 2))) : ''}
+      ${inspectorCard('전략 노드', `<p><strong>${escapeHtml(node.label || nodeId)}</strong><br>${node.count ?? 0} candidates · archived ${node.archived_count ?? 0}<br>avg failure ${percent(node.avg_failure || 0)}</p>`)}
+      ${inspectorCard('트리 안내', `<p>전략 트리는 root에서 시작해 실제 생성된 후보가 생길 때마다 family와 leaf가 추가된다. 노드를 누르면 왼쪽 후보 목록이 해당 branch로 필터링된다.</p>`)}
+      ${rawDetails('strategy tree raw 보기', JSON.stringify(tree, null, 2))}
     </div>
   `;
 }
@@ -731,7 +768,6 @@ function showTreeInspector(nodeId, node, tree) {
 function showNodeInspector(node) {
   const detail = state.selectedCandidate;
   if (!detail || !node) return;
-
   const pathMap = {
     strategy_root: 'strategy_tree.json',
     agent_a: 'prompts/agentA_interpreter_builder.txt',
@@ -743,7 +779,6 @@ function showNodeInspector(node) {
     validator: 'validator_result.json',
     result: 'validator_result.json',
   };
-
   const file = pathMap[node.id] || 'candidate.json';
   inspectorContent.classList.remove('empty');
   inspectorContent.innerHTML = `
@@ -775,16 +810,12 @@ async function selectCandidate(id, { updateInspector = true } = {}) {
   state.selectedCandidate = detail;
   selectedHint.textContent = `${detail.name} · ${detail.level}`;
   renderFocusCard();
-
-  const tree = safeJsonParse(getArtifact(detail, 'strategy_tree.json') || '{"nodes":{},"edges":[]}', { nodes: {}, edges: [] });
+  renderSolverBenchMonitor();
+  renderCandidateList();
+  renderStrategyTree();
   const graph = safeJsonParse(getArtifact(detail, 'agent_graph.json') || '{"nodes":[],"edges":[]}', { nodes: [], edges: [] });
-
-  state.selectedTreeNode = tree.selected_path?.[tree.selected_path.length - 1] || 'root';
   state.selectedGraphNode = null;
   state.selectedGraphEdge = null;
-
-  renderCandidateList();
-  renderStrategyTree(tree);
   renderAgentGraph(graph);
   if (updateInspector) showCandidateInspector(detail);
 }
@@ -792,33 +823,21 @@ async function selectCandidate(id, { updateInspector = true } = {}) {
 function eventSummary(event) {
   const payload = event.payload || {};
   switch (event.kind) {
-    case 'bootstrap':
-      return { title: '초기화 완료', summary: payload.note || payload.message || '빈 상태 부트스트랩 완료' };
-    case 'loop_started':
-      return { title: '루프 시작', summary: payload.message || 'Agent loop 시작' };
-    case 'loop_paused':
-      return { title: '루프 일시정지', summary: payload.message || 'Agent loop 정지' };
-    case 'loop_reset':
-      return { title: '루프 리셋', summary: payload.message || '상태와 후보가 초기화됨' };
-    case 'candidate_generated':
-      return {
-        title: `${payload.name || payload.candidate_id || 'candidate'} 생성`,
-        summary: `iteration ${payload.iteration || '-'} · level ${payload.level || '-'}${payload.parent ? ` · parent ${payload.parent}` : ''}`,
-      };
-    case 'benchmark_completed':
-      return {
-        title: '벤치마크 완료',
-        summary: `${payload.candidate_id || ''} · failure ${percent(payload.failure_rate)}${payload.archived ? ' · archive 진입' : ''}`,
-      };
-    case 'archive_updated':
-      return { title: 'Archive 업데이트', summary: payload.message || '새 hardest candidate가 archive에 추가됨' };
+    case 'bootstrap': return { title: '초기화 완료', summary: payload.note || payload.message || '빈 상태 부트스트랩 완료' };
+    case 'loop_started': return { title: '루프 시작', summary: payload.message || '자동 탐색 시작' };
+    case 'loop_paused': return { title: '루프 멈춤', summary: payload.message || '자동 탐색 일시정지' };
+    case 'loop_reset': return { title: '기록 초기화', summary: payload.message || '후보/평가/이벤트가 초기화됨' };
+    case 'candidate_generated': return { title: `${payload.name || payload.candidate_id || 'candidate'} 생성`, summary: `iteration ${payload.iteration || '-'} · level ${payload.level || '-'}${payload.parent ? ` · parent ${payload.parent}` : ''}` };
+    case 'solver_bench_started': return { title: 'Solver Bench 시작', summary: `${payload.models?.length || 0} models · x${payload.repeat_count || 1} · parallel ${payload.parallelism || 1}` };
+    case 'solver_progress': return { title: 'Solver 진행 중', summary: `${payload.completed || 0}/${payload.total || 0} · ${payload.model_name || ''} · ${payload.task_name || ''} · attempt ${payload.attempt_index || 0}` };
+    case 'benchmark_completed': return { title: '벤치마크 완료', summary: `${payload.candidate_id || ''} · failure ${percent(payload.failure_rate)} · total evals ${payload.total_evals || 0}` };
+    case 'archive_updated': return { title: 'Archive 업데이트', summary: payload.message || '새 hardest candidate가 archive에 추가됨' };
     case 'config_updated': {
       const changes = payload.changes || {};
-      const parts = Object.entries(changes).map(([agent, keys]) => `${agent}: ${(keys || []).join(', ')}`);
-      return { title: '설정 변경', summary: parts.length ? parts.join(' · ') : (payload.message || '설정이 갱신됨') };
+      const parts = Object.entries(changes).map(([k, v]) => `${k}: ${(v || []).join(', ')}`);
+      return { title: '설정 변경', summary: parts.join(' · ') || payload.message || '설정 갱신' };
     }
-    default:
-      return { title: event.kind, summary: payload.message || '세부 payload를 열어 확인할 수 있음' };
+    default: return { title: event.kind, summary: payload.message || '세부 payload를 열어 확인할 수 있음' };
   }
 }
 
@@ -878,27 +897,29 @@ archivedOnlyInput.addEventListener('change', (e) => {
 openSettingsBtn.addEventListener('click', openSettingsModal);
 closeSettingsBtn.addEventListener('click', closeSettingsModal);
 settingsBackdrop.addEventListener('click', closeSettingsModal);
+openaiClearKeyBtn.addEventListener('click', async () => {
+  await clearOpenAIKey();
+});
 saveSettingsBtn.addEventListener('click', async () => {
-  await updateConfig(buildAgentsPayload());
+  const selected = selectedSolverModels();
+  if (!selected.length) {
+    alert('Solver Bench에는 최소 1개 이상의 모델을 선택해야 해.');
+    return;
+  }
+  await updateConfig(buildConfigPayload());
   closeSettingsModal();
 });
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && !settingsModal.classList.contains('hidden')) {
-    closeSettingsModal();
-  }
-});
-
-Object.entries(agentControls).forEach(([agentKey, controls]) => {
-  controls.clearKeyBtn.addEventListener('click', async () => {
-    await clearAgentKey(agentKey);
-  });
+  if (event.key === 'Escape' && !settingsModal.classList.contains('hidden')) closeSettingsModal();
 });
 
 startBtn.addEventListener('click', () => post('/api/loop/start'));
 pauseBtn.addEventListener('click', () => post('/api/loop/pause'));
 stepBtn.addEventListener('click', () => post('/api/loop/step'));
 resetBtn.addEventListener('click', async () => {
+  const ok = confirm('후보, 평가, 이벤트 기록을 모두 초기화할까?');
+  if (!ok) return;
   await post('/api/loop/reset');
   clearSelection();
   renderCandidateList();
@@ -913,18 +934,30 @@ function connectEvents() {
     if (event.id <= state.lastEventId) return;
     state.lastEventId = event.id;
     addEventItem(event);
-    await refreshOverview();
-    await refreshCandidates({ autoSelect: false });
-    await refreshSelectedIfNeeded();
+
+    const alwaysRefreshOverview = new Set(['loop_started', 'loop_paused', 'loop_reset', 'candidate_generated', 'solver_bench_started', 'solver_progress', 'benchmark_completed', 'archive_updated', 'config_updated']);
+    const refreshListEvents = new Set(['candidate_generated', 'benchmark_completed', 'archive_updated', 'loop_reset']);
+
+    if (alwaysRefreshOverview.has(event.kind)) await refreshOverview();
+    if (refreshListEvents.has(event.kind)) await refreshCandidates({ autoSelect: false });
+    if (event.kind === 'config_updated') await loadConfig();
+    if (event.kind === 'solver_progress' || event.kind === 'benchmark_completed') {
+      if (event.payload?.candidate_id && event.payload.candidate_id === state.selectedId) {
+        await refreshSelectedIfNeeded();
+      }
+    }
+    if (event.kind === 'loop_reset') clearSelection();
   };
 }
 
 async function init() {
   inspectorContent.innerHTML = emptyInspectorHtml();
+  renderMetricGuide();
   renderActionButtons({ status: 'idle' });
   renderFocusCard();
-  strategyTreeStage.innerHTML = panelEmpty('전략 트리가 비어 있음', '후보를 선택하면 여기에 전략 탐색 구조가 나타난다.');
-  graphStage.innerHTML = panelEmpty('실행 그래프가 비어 있음', '후보를 선택하면 Agent A → Agent B → Validator 흐름이 나타난다.');
+  renderSolverBenchMonitor();
+  strategyTreeStage.innerHTML = panelEmpty('전략 트리가 비어 있음', '아직 candidate가 없어서 root만 존재한다.');
+  graphStage.innerHTML = panelEmpty('실행 그래프가 비어 있음', '후보를 선택하면 Agent A → Solver Bench → Validator 흐름이 나타난다.');
   await loadConfig();
   await refreshOverview();
   await preloadEvents();

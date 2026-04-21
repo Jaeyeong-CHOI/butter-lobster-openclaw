@@ -30,20 +30,21 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 loop_service = AgentLoopService()
 
 
-def _agent_config_response(settings: dict[str, object]) -> dict[str, object]:
+def _config_response(settings: dict[str, object]) -> dict[str, object]:
     return {
         "agent_a": {
             "model": settings.get("agent_a_model", "gpt-5.4"),
             "temperature": settings.get("agent_a_temperature", 0.7),
             "thinking": settings.get("agent_a_thinking", "high"),
-            "api_key": store.get_agent_api_key_status("agent_a"),
         },
-        "agent_b": {
-            "model": settings.get("agent_b_model", "gpt-5.4"),
-            "temperature": settings.get("agent_b_temperature", 0.2),
-            "thinking": settings.get("agent_b_thinking", "medium"),
-            "api_key": store.get_agent_api_key_status("agent_b"),
+        "solver_bench": {
+            "enabled_models": settings.get("solver_models", list(OPENAI_MODEL_CATALOG.keys())),
+            "temperature": settings.get("solver_temperature", 0.2),
+            "thinking": settings.get("solver_thinking", "medium"),
+            "repeat_count": settings.get("solver_repeat_count", 5),
+            "parallelism": settings.get("solver_parallelism", 10),
         },
+        "providers": {"openai": {"api_key": store.get_openai_api_key_status()}},
     }
 
 
@@ -76,7 +77,7 @@ async def api_config() -> JSONResponse:
     return JSONResponse(
         {
             "settings": settings,
-            "agents": _agent_config_response(settings),
+            "config": _config_response(settings),
             "openai_models": list(OPENAI_MODEL_CATALOG.keys()),
             "thinking_options": list(THINKING_OPTIONS),
         }
@@ -85,53 +86,97 @@ async def api_config() -> JSONResponse:
 
 @app.post("/api/config")
 async def api_config_update(payload: dict = Body(...)) -> JSONResponse:
-    agents_payload = payload.get("agents") or {}
-    changed: dict[str, list[str]] = {"agent_a": [], "agent_b": []}
+    changed: dict[str, list[str]] = {}
 
-    for agent_name in ("agent_a", "agent_b"):
-        agent_payload = agents_payload.get(agent_name)
-        if not isinstance(agent_payload, dict):
-            continue
-
-        model = agent_payload.get("model")
+    agent_a_payload = payload.get("agent_a") or payload.get("agents", {}).get("agent_a") or {}
+    if isinstance(agent_a_payload, dict):
+        agent_a_changes: list[str] = []
+        model = agent_a_payload.get("model")
         if model is not None:
             if model not in OPENAI_MODEL_CATALOG:
-                raise HTTPException(status_code=400, detail=f"Unknown model for {agent_name}")
-            store.set_setting(f"{agent_name}_model", model)
-            changed[agent_name].append("model")
-
-        temperature = agent_payload.get("temperature")
+                raise HTTPException(status_code=400, detail="Unknown model for agent_a")
+            store.set_setting("agent_a_model", model)
+            agent_a_changes.append("model")
+        temperature = agent_a_payload.get("temperature")
         if temperature is not None:
             try:
                 normalized_temp = _coerce_temperature(temperature)
             except (TypeError, ValueError) as exc:
-                raise HTTPException(status_code=400, detail=f"Invalid temperature for {agent_name}: {exc}") from exc
-            store.set_setting(f"{agent_name}_temperature", normalized_temp)
-            changed[agent_name].append("temperature")
-
-        thinking = agent_payload.get("thinking")
+                raise HTTPException(status_code=400, detail=f"Invalid temperature for agent_a: {exc}") from exc
+            store.set_setting("agent_a_temperature", normalized_temp)
+            agent_a_changes.append("temperature")
+        thinking = agent_a_payload.get("thinking")
         if thinking is not None:
             if thinking not in THINKING_OPTIONS:
-                raise HTTPException(status_code=400, detail=f"Invalid thinking value for {agent_name}")
-            store.set_setting(f"{agent_name}_thinking", thinking)
-            changed[agent_name].append("thinking")
+                raise HTTPException(status_code=400, detail="Invalid thinking value for agent_a")
+            store.set_setting("agent_a_thinking", thinking)
+            agent_a_changes.append("thinking")
+        if agent_a_changes:
+            changed["agent_a"] = agent_a_changes
 
-        api_key = agent_payload.get("api_key")
+    solver_payload = payload.get("solver_bench") or payload.get("agents", {}).get("solver_bench") or {}
+    if isinstance(solver_payload, dict):
+        solver_changes: list[str] = []
+        enabled_models = solver_payload.get("enabled_models")
+        if enabled_models is not None:
+            if not isinstance(enabled_models, list) or not enabled_models:
+                raise HTTPException(status_code=400, detail="enabled_models must be a non-empty list")
+            unknown = [model for model in enabled_models if model not in OPENAI_MODEL_CATALOG]
+            if unknown:
+                raise HTTPException(status_code=400, detail=f"Unknown models in solver bench: {unknown}")
+            store.set_setting("solver_models", enabled_models)
+            solver_changes.append("enabled_models")
+        temperature = solver_payload.get("temperature")
+        if temperature is not None:
+            try:
+                normalized_temp = _coerce_temperature(temperature)
+            except (TypeError, ValueError) as exc:
+                raise HTTPException(status_code=400, detail=f"Invalid temperature for solver_bench: {exc}") from exc
+            store.set_setting("solver_temperature", normalized_temp)
+            solver_changes.append("temperature")
+        thinking = solver_payload.get("thinking")
+        if thinking is not None:
+            if thinking not in THINKING_OPTIONS:
+                raise HTTPException(status_code=400, detail="Invalid thinking value for solver_bench")
+            store.set_setting("solver_thinking", thinking)
+            solver_changes.append("thinking")
+        repeat_count = solver_payload.get("repeat_count")
+        if repeat_count is not None:
+            repeats = int(repeat_count)
+            if repeats < 1 or repeats > 20:
+                raise HTTPException(status_code=400, detail="repeat_count must be between 1 and 20")
+            store.set_setting("solver_repeat_count", repeats)
+            solver_changes.append("repeat_count")
+        parallelism = solver_payload.get("parallelism")
+        if parallelism is not None:
+            parallel = int(parallelism)
+            if parallel < 1 or parallel > 50:
+                raise HTTPException(status_code=400, detail="parallelism must be between 1 and 50")
+            store.set_setting("solver_parallelism", parallel)
+            solver_changes.append("parallelism")
+        if solver_changes:
+            changed["solver_bench"] = solver_changes
+
+    providers_payload = payload.get("providers") or {}
+    openai_payload = providers_payload.get("openai") if isinstance(providers_payload, dict) else None
+    if isinstance(openai_payload, dict):
+        provider_changes: list[str] = []
+        api_key = openai_payload.get("api_key")
         if isinstance(api_key, str) and api_key.strip():
-            store.set_agent_api_key(agent_name, api_key.strip())
-            changed[agent_name].append("api_key")
+            store.set_openai_api_key(api_key.strip())
+            provider_changes.append("api_key")
+        if openai_payload.get("clear_api_key"):
+            store.clear_openai_api_key()
+            provider_changes.append("api_key_cleared")
+        if provider_changes:
+            changed["openai"] = provider_changes
 
-        if agent_payload.get("clear_api_key"):
-            store.clear_agent_api_key(agent_name)
-            changed[agent_name].append("api_key_cleared")
-
-    flattened = {agent: keys for agent, keys in changed.items() if keys}
-    if flattened:
+    if changed:
         store.insert_event(
             "config_updated",
             {
-                "message": "Agent settings updated",
-                "changes": flattened,
+                "message": "Loop configuration updated",
+                "changes": changed,
                 "note": "Applies to new iterations. Reset loop if you want a clean history under the new configuration.",
             },
             datetime.now(timezone.utc).isoformat(),
@@ -142,7 +187,7 @@ async def api_config_update(payload: dict = Body(...)) -> JSONResponse:
         {
             "ok": True,
             "settings": settings,
-            "agents": _agent_config_response(settings),
+            "config": _config_response(settings),
             "openai_models": list(OPENAI_MODEL_CATALOG.keys()),
             "thinking_options": list(THINKING_OPTIONS),
         }

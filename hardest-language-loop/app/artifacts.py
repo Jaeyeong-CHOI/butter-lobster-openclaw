@@ -309,7 +309,7 @@ let () =
             [ocaml_bin, str(tmp_path)],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=8,
         )
     except subprocess.TimeoutExpired:
         tmp_path.unlink(missing_ok=True)
@@ -509,13 +509,19 @@ def _language_spec(candidate: dict[str, Any], parent_name: str | None) -> dict[s
             "thinking": meta.get("agent_a_thinking", "high"),
         },
     )
-    agent_b_settings = meta.get(
-        "agent_b_settings",
-        {
-            "model": meta.get("agent_b_model", "gpt-5.4"),
-            "temperature": meta.get("agent_b_temperature", 0.2),
-            "thinking": meta.get("agent_b_thinking", "medium"),
-        },
+    solver_settings = meta.get(
+        "solver_settings",
+        meta.get(
+            "agent_b_settings",
+            {
+                "enabled_models": [meta.get("agent_b_model", "gpt-5.4")],
+                "temperature": meta.get("agent_b_temperature", 0.2),
+                "thinking": meta.get("agent_b_thinking", "medium"),
+                "repeat_count": 1,
+                "parallelism": 1,
+                "provider": "openai",
+            },
+        ),
     )
     semantics = {
         "control_flow": "inverted_if" if level in {"L3", "L4", "L5"} else "canonical_if",
@@ -540,12 +546,12 @@ def _language_spec(candidate: dict[str, Any], parent_name: str | None) -> dict[s
         "semantics": semantics,
         "pipeline": {
             "agent_a": "Interpreter Builder / Mutator",
-            "agent_b": "Program Generator / Solver",
+            "agent_b": "Solver bench across enabled models",
             "validator": "Deterministic JSON->AST->Interpreter execution",
         },
         "agent_settings": {
             "agent_a": agent_a_settings,
-            "agent_b": agent_b_settings,
+            "solver_bench": solver_settings,
         },
         "status": candidate.get("status", "generated"),
         "archived": bool(candidate.get("archived")),
@@ -829,29 +835,32 @@ def _ast_schema(candidate: dict[str, Any]) -> dict[str, Any]:
 def _program_attempts(candidate: dict[str, Any], evaluations: list[dict[str, Any]] | None, tasks: list[dict[str, Any]]) -> dict[str, Any]:
     rows = evaluations or []
     task_map = {task["task_name"]: task for task in tasks}
-    fallback_model = ((candidate.get("metadata", {}) or {}).get("agent_b_model") or "gpt-5.4")
-    if not rows:
-        rows = [
-            {
-                "task_name": task["task_name"],
-                "model_name": fallback_model,
-                "success": True,
-            }
-            for task in tasks
-        ]
     attempts = []
     for row in rows:
         task = row["task_name"]
         task_info = task_map[task]
         expected_success = bool(row.get("success", True))
+        meta = row.get("metadata", {}) or {}
+        if meta.get("program"):
+            program = meta["program"]
+            entry_name = meta.get("entry_name", task_info["entry_name"])
+            params = meta.get("params", task_info["params"])
+            tests = meta.get("tests", task_info["tests"])
+        else:
+            program = _build_task_program(candidate, task_info, expected_success)
+            entry_name = task_info["entry_name"]
+            params = task_info["params"]
+            tests = task_info["tests"]
         prog = {
             "format": "json_ast_v1",
             "task_name": task,
-            "entry_name": task_info["entry_name"],
-            "params": task_info["params"],
+            "entry_name": entry_name,
+            "params": params,
             "model_name": row["model_name"],
-            "program": _build_task_program(candidate, task_info, expected_success),
-            "tests": task_info["tests"],
+            "provider": meta.get("provider", "simulated"),
+            "attempt_index": meta.get("attempt_index", 1),
+            "program": program,
+            "tests": tests,
             "expected_success": expected_success,
         }
         attempts.append(prog)
@@ -943,14 +952,21 @@ def _agent_prompts(candidate: dict[str, Any], parent_name: str | None) -> dict[s
             "thinking": meta.get("agent_a_thinking", "high"),
         },
     )
-    agent_b = meta.get(
-        "agent_b_settings",
-        {
-            "model": meta.get("agent_b_model", "gpt-5.4"),
-            "temperature": meta.get("agent_b_temperature", 0.2),
-            "thinking": meta.get("agent_b_thinking", "medium"),
-        },
+    solver_settings = meta.get(
+        "solver_settings",
+        meta.get(
+            "agent_b_settings",
+            {
+                "enabled_models": [meta.get("agent_b_model", "gpt-5.4")],
+                "temperature": meta.get("agent_b_temperature", 0.2),
+                "thinking": meta.get("agent_b_thinking", "medium"),
+                "repeat_count": 1,
+                "parallelism": 1,
+                "provider": "openai",
+            },
+        ),
     )
+    enabled_models = solver_settings.get("enabled_models", [meta.get("agent_b_model", "gpt-5.4")])
     return {
         "prompts/agentA_interpreter_builder.txt": f"""You are Agent A (Interpreter Builder / Mutator).
 
@@ -975,9 +991,11 @@ Interpreter hint:
 """,
         "prompts/agentB_solver.txt": f"""You are Agent B (Program Generator / Solver).
 
-Selected OpenAI model: {agent_b.get('model', 'gpt-5.4')}
-Thinking: {agent_b.get('thinking', 'medium')}
-Temperature: {agent_b.get('temperature', 0.2)}
+Enabled model pool: {', '.join(enabled_models)}
+Thinking: {solver_settings.get('thinking', 'medium')}
+Temperature: {solver_settings.get('temperature', 0.2)}
+Repeat count: {solver_settings.get('repeat_count', 1)}
+Parallelism: {solver_settings.get('parallelism', 1)}
 
 Input artifacts:
 - interpreter.ml

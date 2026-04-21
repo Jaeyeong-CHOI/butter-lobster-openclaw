@@ -11,15 +11,26 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "loop.db"
 SECRETS_PATH = BASE_DIR / "data" / "secrets.json"
 CANDIDATE_ROOT = BASE_DIR / "data" / "candidates"
-AGENT_KEYS = ("agent_a", "agent_b")
 
 DEFAULT_SETTINGS = {
     "agent_a_model": "gpt-5.4",
     "agent_a_temperature": 0.7,
     "agent_a_thinking": "high",
-    "agent_b_model": "gpt-5.4",
-    "agent_b_temperature": 0.2,
-    "agent_b_thinking": "medium",
+    "solver_models": [
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.4-nano",
+        "gpt-4.1",
+        "gpt-4.1-mini",
+        "gpt-4o",
+        "gpt-4o-mini",
+        "o4-mini",
+    ],
+    "solver_temperature": 0.2,
+    "solver_thinking": "medium",
+    "solver_repeat_count": 5,
+    "solver_parallelism": 10,
+    "provider_default": "openai",
 }
 
 
@@ -27,12 +38,6 @@ def _mask_api_key(key: str) -> str:
     if len(key) <= 10:
         return "*" * len(key)
     return f"{key[:7]}...{key[-4:]}"
-
-
-def _agent_secret_key(agent: str) -> str:
-    if agent not in AGENT_KEYS:
-        raise ValueError(f"Unknown agent: {agent}")
-    return f"{agent}_api_key"
 
 
 def _read_secrets() -> dict[str, Any]:
@@ -75,38 +80,6 @@ def get_openai_api_key_status() -> dict[str, Any]:
     if not key:
         return {"configured": False, "masked": None}
     return {"configured": True, "masked": _mask_api_key(key)}
-
-
-def set_agent_api_key(agent: str, api_key: str) -> None:
-    secrets = _read_secrets()
-    secrets[_agent_secret_key(agent)] = api_key
-    _write_secrets(secrets)
-
-
-def clear_agent_api_key(agent: str) -> None:
-    secrets = _read_secrets()
-    secrets.pop(_agent_secret_key(agent), None)
-    _write_secrets(secrets)
-
-
-def get_agent_api_key(agent: str) -> str | None:
-    secrets = _read_secrets()
-    specific = secrets.get(_agent_secret_key(agent))
-    if isinstance(specific, str) and specific:
-        return specific
-    legacy = secrets.get("openai_api_key")
-    return legacy if isinstance(legacy, str) and legacy else None
-
-
-def get_agent_api_key_status(agent: str) -> dict[str, Any]:
-    secrets = _read_secrets()
-    specific = secrets.get(_agent_secret_key(agent))
-    if isinstance(specific, str) and specific:
-        return {"configured": True, "masked": _mask_api_key(specific), "source": "agent"}
-    legacy = secrets.get("openai_api_key")
-    if isinstance(legacy, str) and legacy:
-        return {"configured": True, "masked": _mask_api_key(legacy), "source": "legacy_shared"}
-    return {"configured": False, "masked": None, "source": None}
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
@@ -176,6 +149,9 @@ def init_db() -> None:
             );
             """
         )
+        eval_columns = {row["name"] for row in conn.execute("PRAGMA table_info(evaluations)").fetchall()}
+        if "metadata_json" not in eval_columns:
+            conn.execute("ALTER TABLE evaluations ADD COLUMN metadata_json TEXT NOT NULL DEFAULT '{}'")
         conn.execute(
             """
             INSERT INTO loop_state(id, status, iteration, updated_at, note)
@@ -286,8 +262,8 @@ def insert_evaluation(evaluation: dict[str, Any]) -> None:
         conn.execute(
             """
             INSERT INTO evaluations(
-                id, candidate_id, model_name, task_name, prompt_mode, success, score, notes, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                id, candidate_id, model_name, task_name, prompt_mode, success, score, notes, created_at, metadata_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 evaluation["id"],
@@ -299,6 +275,7 @@ def insert_evaluation(evaluation: dict[str, Any]) -> None:
                 evaluation["score"],
                 evaluation.get("notes", ""),
                 evaluation["created_at"],
+                json.dumps(evaluation.get("metadata", {}), ensure_ascii=False),
             ),
         )
 
@@ -323,13 +300,13 @@ def list_events(after_id: int = 0, limit: int = 100) -> list[dict[str, Any]]:
 def _benchmark_summary(conn: sqlite3.Connection) -> dict[str, Any]:
     model_rows = conn.execute(
         """
-        SELECT model_name, COUNT(*) AS n, AVG(success) AS pass_rate
+        SELECT model_name, COUNT(*) AS n, SUM(success) AS success_count, AVG(success) AS pass_rate
         FROM evaluations GROUP BY model_name ORDER BY pass_rate ASC, model_name ASC
         """
     ).fetchall()
     task_rows = conn.execute(
         """
-        SELECT task_name, COUNT(*) AS n, AVG(success) AS pass_rate
+        SELECT task_name, COUNT(*) AS n, SUM(success) AS success_count, AVG(success) AS pass_rate
         FROM evaluations GROUP BY task_name ORDER BY pass_rate ASC, task_name ASC
         """
     ).fetchall()
@@ -344,6 +321,82 @@ def _benchmark_summary(conn: sqlite3.Connection) -> dict[str, Any]:
         "tasks": [row_to_dict(r) for r in task_rows],
         "levels": [row_to_dict(r) for r in level_rows],
     }
+
+
+def _strategy_tree_summary(conn: sqlite3.Connection) -> dict[str, Any]:
+    rows = conn.execute("SELECT id, name, metadata_json, archived, failure_rate FROM candidates ORDER BY created_at ASC").fetchall()
+    nodes: dict[str, Any] = {
+        "root": {
+            "label": "Hardest-language search root",
+            "kind": "root",
+            "status": "active",
+            "count": 0,
+            "archived_count": 0,
+            "avg_failure": 0.0,
+        }
+    }
+    edges: list[list[str]] = []
+    family_order: list[str] = []
+    leaf_order: dict[str, list[str]] = {}
+    family_stats: dict[str, dict[str, Any]] = {}
+    leaf_stats: dict[str, dict[str, Any]] = {}
+
+    for row in rows:
+        meta = json.loads(row["metadata_json"] or "{}")
+        family = meta.get("strategy_family") or "unclassified"
+        leaf = meta.get("strategy_leaf") or f"{family}_leaf"
+        family_label = family.replace("_", " ").title()
+        leaf_label = leaf.replace("_", " ").title()
+        if family not in family_stats:
+            family_order.append(family)
+            family_stats[family] = {"count": 0, "archived_count": 0, "failure_sum": 0.0}
+            nodes[family] = {"label": family_label, "kind": "family", "status": "explored"}
+            edges.append(["root", family])
+            leaf_order[family] = []
+        if leaf not in leaf_stats:
+            leaf_order[family].append(leaf)
+            leaf_stats[leaf] = {"count": 0, "archived_count": 0, "failure_sum": 0.0, "family": family}
+            nodes[leaf] = {"label": leaf_label, "kind": "strategy", "status": "candidate"}
+            edges.append([family, leaf])
+
+        family_stats[family]["count"] += 1
+        family_stats[family]["archived_count"] += int(row["archived"])
+        family_stats[family]["failure_sum"] += float(row["failure_rate"])
+        leaf_stats[leaf]["count"] += 1
+        leaf_stats[leaf]["archived_count"] += int(row["archived"])
+        leaf_stats[leaf]["failure_sum"] += float(row["failure_rate"])
+
+    total = len(rows)
+    archived_total = sum(int(row["archived"]) for row in rows)
+    nodes["root"].update(
+        {
+            "count": total,
+            "archived_count": archived_total,
+            "avg_failure": round(sum(float(row["failure_rate"]) for row in rows) / total, 3) if total else 0.0,
+        }
+    )
+
+    for family in family_order:
+        stats = family_stats[family]
+        nodes[family].update(
+            {
+                "count": stats["count"],
+                "archived_count": stats["archived_count"],
+                "avg_failure": round(stats["failure_sum"] / stats["count"], 3) if stats["count"] else 0.0,
+            }
+        )
+    for family, leaves in leaf_order.items():
+        for leaf in leaves:
+            stats = leaf_stats[leaf]
+            nodes[leaf].update(
+                {
+                    "count": stats["count"],
+                    "archived_count": stats["archived_count"],
+                    "avg_failure": round(stats["failure_sum"] / stats["count"], 3) if stats["count"] else 0.0,
+                }
+            )
+
+    return {"nodes": nodes, "edges": edges}
 
 
 def get_overview() -> dict[str, Any]:
@@ -361,6 +414,7 @@ def get_overview() -> dict[str, Any]:
         return {
             "state": state,
             "settings": get_settings(),
+            "providers": {"openai": get_openai_api_key_status()},
             "stats": {
                 "total_candidates": total_candidates,
                 "archived_candidates": archived,
@@ -368,6 +422,7 @@ def get_overview() -> dict[str, Any]:
             },
             "hardest": row_to_dict(hardest),
             "benchmark": _benchmark_summary(conn),
+            "strategy_tree": _strategy_tree_summary(conn),
         }
 
 
@@ -396,7 +451,12 @@ def get_candidate(candidate_id: str) -> dict[str, Any] | None:
             "SELECT * FROM evaluations WHERE candidate_id = ? ORDER BY created_at ASC",
             (candidate_id,),
         ).fetchall()
-        item["evaluations"] = [row_to_dict(r) for r in eval_rows]
+        evaluations = []
+        for row in eval_rows:
+            data = row_to_dict(row) or {}
+            data["metadata"] = json.loads(data.pop("metadata_json", "{}"))
+            evaluations.append(data)
+        item["evaluations"] = evaluations
         return item
 
 

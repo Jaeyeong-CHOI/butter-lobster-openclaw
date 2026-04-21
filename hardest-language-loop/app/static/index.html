@@ -27,7 +27,7 @@
               <span class="action-icon">⚙</span>
               <span class="action-text">
                 <span class="action-title">설정 열기</span>
-                <span class="action-copy">Agent A/B 모델, 키, 파라미터 수정</span>
+                <span class="action-copy">Agent A + Solver Bench + OpenAI 키 수정</span>
               </span>
             </button>
             <button id="startBtn" class="action-btn action-start">
@@ -89,10 +89,18 @@
           <div id="focusCard" class="focus-card"></div>
         </section>
 
+        <section class="panel benchmark-panel">
+          <div class="panel-head">
+            <h2>모델 벤치 모니터</h2>
+            <span class="muted">선택한 candidate에 대해 모델별 성공 횟수 / 전체 시도 수를 표시</span>
+          </div>
+          <div id="solverBenchMonitor" class="solver-monitor-grid"></div>
+        </section>
+
         <section class="panel graph-panel">
           <div class="panel-head">
             <h2>전략 트리</h2>
-            <span class="muted">노드를 누르면 해당 전략으로 후보가 필터링됨</span>
+            <span class="muted">root에서 시작해 실제 탐색 결과에 따라 가지가 계속 추가됨</span>
           </div>
           <div class="legend-row">
             <span class="legend-pill legend-root">root</span>
@@ -141,6 +149,14 @@
           </div>
         </section>
 
+        <section class="panel">
+          <div class="panel-head">
+            <h2>지표 설명</h2>
+            <span class="muted">지금 화면에 나오는 핵심 지표가 무엇을 뜻하는지</span>
+          </div>
+          <div id="metricGuide" class="metric-guide"></div>
+        </section>
+
         <section class="panel event-panel">
           <div class="panel-head">
             <h2>이벤트 스트림</h2>
@@ -158,10 +174,27 @@
           <div>
             <div class="eyebrow">Agent configuration</div>
             <h2 id="settingsTitle">에이전트 설정</h2>
-            <p class="settings-modal-copy">Agent A / B 각각에 대해 모델, API key, thinking, temperature를 따로 설정할 수 있다.</p>
+            <p class="settings-modal-copy">Agent A는 단일 생성 모델로, Solver Bench는 모델 풀 전체 평가 설정으로 구성한다. API 키는 OpenAI 공유 키 1개만 사용한다.</p>
           </div>
           <button id="closeSettingsBtn" class="secondary">닫기</button>
         </div>
+
+        <section class="settings-provider-card">
+          <div class="settings-agent-head">
+            <h3>Provider / OpenAI</h3>
+            <span class="muted">공유 API 키 1개 · 향후 다른 provider 확장 가능하도록 구조 유지</span>
+          </div>
+          <div class="settings-form-grid single-provider-grid">
+            <label class="control-block key-block settings-key-block">
+              <span>OpenAI API Key</span>
+              <input id="openaiKeyInput" type="password" placeholder="sk-..." />
+              <div class="settings-key-meta">
+                <span id="openaiKeyStatus" class="muted">상태 불러오는 중…</span>
+                <button id="openaiClearKeyBtn" class="secondary small">키 삭제</button>
+              </div>
+            </label>
+          </div>
+        </section>
 
         <div class="settings-agent-grid">
           <section class="settings-agent-card">
@@ -182,49 +215,42 @@
                 <span>Temperature</span>
                 <input id="agentATemperatureInput" type="number" min="0" max="2" step="0.1" />
               </label>
-              <label class="control-block key-block settings-key-block">
-                <span>API Key</span>
-                <input id="agentAKeyInput" type="password" placeholder="sk-..." />
-                <div class="settings-key-meta">
-                  <span id="agentAKeyStatus" class="muted">상태 불러오는 중…</span>
-                  <button id="agentAClearKeyBtn" class="secondary small">키 삭제</button>
-                </div>
-              </label>
+              <div class="settings-inline-note">Agent A는 언어/인터프리터를 제안하는 모델 하나만 사용한다.</div>
             </div>
           </section>
 
           <section class="settings-agent-card">
             <div class="settings-agent-head">
-              <h3>Agent B</h3>
-              <span class="muted">Program Generator / Solver</span>
+              <h3>Solver Bench</h3>
+              <span class="muted">선택한 모델 풀 전체가 같은 candidate를 풀어본다</span>
             </div>
             <div class="settings-form-grid">
-              <label class="control-block">
-                <span>모델</span>
-                <select id="agentBModelSelect"></select>
-              </label>
+              <div class="control-block settings-key-block">
+                <span>평가할 모델 풀</span>
+                <div id="solverModelChecklist" class="model-checklist"></div>
+              </div>
               <label class="control-block">
                 <span>Thinking</span>
-                <select id="agentBThinkingSelect"></select>
+                <select id="solverThinkingSelect"></select>
               </label>
               <label class="control-block">
                 <span>Temperature</span>
-                <input id="agentBTemperatureInput" type="number" min="0" max="2" step="0.1" />
+                <input id="solverTemperatureInput" type="number" min="0" max="2" step="0.1" />
               </label>
-              <label class="control-block key-block settings-key-block">
-                <span>API Key</span>
-                <input id="agentBKeyInput" type="password" placeholder="sk-..." />
-                <div class="settings-key-meta">
-                  <span id="agentBKeyStatus" class="muted">상태 불러오는 중…</span>
-                  <button id="agentBClearKeyBtn" class="secondary small">키 삭제</button>
-                </div>
+              <label class="control-block">
+                <span>문제당 반복 횟수</span>
+                <input id="solverRepeatCountInput" type="number" min="1" max="20" step="1" />
+              </label>
+              <label class="control-block">
+                <span>병렬 요청 수</span>
+                <input id="solverParallelismInput" type="number" min="1" max="50" step="1" />
               </label>
             </div>
           </section>
         </div>
 
         <div class="settings-modal-actions">
-          <div class="settings-help">빈 API key 입력칸은 그대로 두면 기존 키를 유지하고, 삭제 버튼은 해당 agent의 개별 키를 지운다.</div>
+          <div class="settings-help">모델 풀에 체크된 모델은 candidate 생성 후 각각 모든 task를 반복 시도한다. 병렬 요청 수를 너무 높이면 API rate limit에 걸릴 수 있다.</div>
           <button id="saveSettingsBtn">설정 저장</button>
         </div>
       </section>
