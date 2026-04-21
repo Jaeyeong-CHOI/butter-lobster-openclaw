@@ -7,8 +7,11 @@
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
     <header class="topbar">
       <div class="brand">
+        <div class="eyebrow">Executable pipeline monitor</div>
         <h1>Hardest Language Loop</h1>
         <p class="subtitle">Graph-first interface for strategy search, agent coordination, and executable validation.</p>
       </div>
@@ -57,6 +60,12 @@
             <h2>Strategy Tree</h2>
             <span class="muted">click a node to filter candidates</span>
           </div>
+          <div class="legend-row">
+            <span class="legend-pill legend-root">root</span>
+            <span class="legend-pill legend-family">family</span>
+            <span class="legend-pill legend-strategy">strategy</span>
+            <span class="legend-note">selected branch = active search direction</span>
+          </div>
           <div id="strategyTreeStage" class="tree-stage"></div>
         </section>
 
@@ -64,6 +73,12 @@
           <div class="panel-head">
             <h2>Agent Exchange Graph</h2>
             <span class="muted">click nodes for prompts/files · click edges for exchanged information</span>
+          </div>
+          <div class="legend-row">
+            <span class="legend-pill legend-agent">agent</span>
+            <span class="legend-pill legend-artifact">artifact</span>
+            <span class="legend-pill legend-strategy">strategy</span>
+            <span class="legend-note">edges represent actual information flow</span>
           </div>
           <div id="graphStage" class="graph-stage"></div>
         </section>
@@ -84,7 +99,11 @@
             <span id="selectedHint" class="muted">Select a candidate</span>
           </div>
           <div id="inspectorContent" class="inspector empty">
-            Click a candidate, graph node, or graph edge to inspect details.
+            <div class="empty-state">
+              <div class="empty-icon">◎</div>
+              <div class="empty-title">Select a candidate, node, or edge</div>
+              <div class="empty-copy">The inspector will show prompts, JSON contracts, task definitions, and validator artifacts.</div>
+            </div>
           </div>
         </section>
 
