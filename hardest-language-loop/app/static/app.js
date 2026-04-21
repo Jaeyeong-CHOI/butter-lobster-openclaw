@@ -29,50 +29,75 @@ const clearKeyBtn = document.getElementById('clearKeyBtn');
 const configHint = document.getElementById('configHint');
 
 const artifactGlossary = {
+  'spec.md': {
+    title: '후보 언어 개요 문서',
+    summary: '이 후보 언어의 핵심 정보를 사람이 읽기 쉬운 마크다운 문서로 정리한 파일이다.',
+    why: '후보의 수준, 부모 후보, 변이 요약, 파이프라인 구조를 빠르게 훑어볼 때 가장 먼저 보는 요약본이다.',
+  },
   'ast_schema.json': {
-    title: 'AST contract',
-    summary: 'Defines the JSON shape Agent B must submit. It is the machine-readable grammar for nodes, fields, and nesting rules.',
-    why: 'Without this, the solver could emit arbitrary JSON that the validator cannot reconstruct into the language AST.',
+    title: 'AST 스키마 계약',
+    summary: 'Agent B가 어떤 JSON 구조로 프로그램을 제출해야 하는지 정의한 계약서다. 노드 종류, 필드 이름, 중첩 규칙이 여기에 들어간다.',
+    why: '이 파일이 없으면 Solver가 제멋대로 JSON을 만들 수 있고, Validator는 그것을 언어 AST로 안정적으로 복원할 수 없다.',
   },
   'tasks.json': {
-    title: 'Task bank',
-    summary: 'Lists benchmark tasks, prompts, categories, and expected behavior for each candidate language.',
-    why: 'This is the workload Agent B tries to solve and the validator uses to judge whether execution matched the requested behavior.',
+    title: '벤치마크 태스크 묶음',
+    summary: '후보 언어마다 풀어야 할 문제 목록을 담은 파일이다. 프롬프트, 카테고리, 기대 동작이 함께 들어간다.',
+    why: 'Agent B는 이 파일을 보고 무엇을 풀어야 하는지 결정하고, Validator는 실제 실행 결과가 기대 동작과 맞는지 비교한다.',
   },
   'interpreter.ml': {
-    title: 'Executable language definition',
-    summary: 'The OCaml interpreter is the ground-truth semantics of the candidate language.',
-    why: 'It replaces vague natural-language descriptions with an executable source of truth for evaluation.',
+    title: '실행 가능한 언어 정의',
+    summary: '후보 언어의 의미론을 실제로 실행 가능한 OCaml 인터프리터로 담아둔 파일이다.',
+    why: '모호한 자연어 설명 대신, 이 파일이 언어의 최종 기준점이 된다. Validator도 결국 이 인터프리터를 기준으로 실행한다.',
+  },
+  'agent_graph.json': {
+    title: '에이전트 그래프 데이터',
+    summary: '노드와 엣지의 배치, 종류, 상태, 정보 흐름을 프론트엔드가 그릴 수 있도록 구조화한 파일이다.',
+    why: '그래프 UI는 이 파일을 읽어서 어떤 에이전트가 어떤 artifact를 만들고, 어떤 정보가 어디로 흐르는지 시각화한다.',
   },
   'program_attempts.json': {
-    title: 'Solver output bundle',
-    summary: 'Stores Agent B program submissions in JSON AST form, often with retries or variants.',
-    why: 'This is what gets parsed, reconstructed into AST, and executed by the validator.',
+    title: 'Solver 제출 결과 묶음',
+    summary: 'Agent B가 만든 프로그램 시도들을 JSON AST 형태로 저장한 파일이다. 재시도나 변형 버전도 함께 담을 수 있다.',
+    why: 'Validator는 바로 이 파일의 내용을 읽어서 AST로 복원하고 인터프리터에 넣어 실행한다.',
   },
   'validator_result.json': {
-    title: 'Deterministic verdict',
-    summary: 'Contains parse status, execution outcome, and whether the produced outputs matched the expected task behavior.',
-    why: 'This file turns the experiment into a measurable benchmark instead of a subjective prompt-reading exercise.',
+    title: '결정론적 검증 결과',
+    summary: '파싱 성공 여부, 실행 성공 여부, 출력 일치 여부 등 Validator의 최종 판정을 담은 파일이다.',
+    why: '이 파일 덕분에 실험이 단순한 인상평이 아니라, 재현 가능한 벤치마크 결과로 남는다.',
   },
   'prompts/agentA_interpreter_builder.txt': {
-    title: 'Agent A prompt',
-    summary: 'Instruction set for mutating or building interpreters.',
-    why: 'This prompt controls how the language design space is explored.',
+    title: 'Agent A 프롬프트',
+    summary: '인터프리터를 새로 만들거나 기존 것을 변형하라고 지시하는 프롬프트다.',
+    why: '언어 설계 공간을 어떤 방향으로 탐색할지, 어떤 제약을 둘지 이 프롬프트가 정한다.',
   },
   'prompts/agentB_solver.txt': {
-    title: 'Agent B prompt',
-    summary: 'Instruction set for producing a candidate program under the selected language semantics.',
-    why: 'This is the exact interface between the language definition and the solver model.',
+    title: 'Agent B 프롬프트',
+    summary: '선택된 언어 의미론 아래에서 프로그램을 생성하라고 지시하는 프롬프트다.',
+    why: '언어 정의와 실제 Solver 모델 사이를 이어주는 직접적인 인터페이스 역할을 한다.',
   },
   'language_spec.json': {
-    title: 'Candidate summary',
-    summary: 'High-level metadata about the candidate: scores, mutation summary, semantics mode, and pipeline settings.',
-    why: 'Useful quick reference before diving into raw prompt and artifact files.',
+    title: '후보 언어 구조 요약',
+    summary: '후보 점수, 변이 요약, 의미론 모드, 파이프라인 설정 같은 상위 메타데이터를 모아둔 파일이다.',
+    why: '세부 프롬프트와 실행 결과를 보기 전에, 이 후보가 어떤 성격인지 빠르게 파악할 수 있다.',
   },
   'strategy_tree.json': {
-    title: 'Search trace',
-    summary: 'Encodes the strategy family and leaf selected for this candidate.',
-    why: 'It explains how this candidate sits inside the broader strategy exploration tree.',
+    title: '전략 탐색 트리',
+    summary: '이 후보가 어떤 전략 family와 leaf에서 나왔는지 구조적으로 기록한 파일이다.',
+    why: '현재 후보가 전체 탐색 공간 안에서 어디에 위치하는지 설명해준다.',
+  },
+  'candidate.json': {
+    title: '원본 후보 레코드',
+    summary: '데이터베이스에 저장된 후보의 원본 필드들을 JSON으로 덤프한 파일이다.',
+    why: '가공 전 원본 메타데이터를 그대로 보고 싶을 때 기준점이 된다.',
+  },
+  'analysis.json': {
+    title: '분석 요약',
+    summary: '실행 결과를 바탕으로 계산된 failure rate나 추가 분석값을 모아둔 파일이다.',
+    why: '후보 언어의 난이도와 특성을 후처리 관점에서 해석할 때 필요하다.',
+  },
+  'evaluations.json': {
+    title: '개별 평가 결과',
+    summary: '모델별·문제별 실행 결과를 한 줄씩 쌓아둔 평가 로그다.',
+    why: '어떤 모델이 어떤 문제에서 실패했는지 세부 레벨에서 추적할 수 있다.',
   },
 };
 
@@ -127,12 +152,32 @@ function glossaryHtml(path) {
   return inspectorCard(entry.title, `<p>${escapeHtml(entry.summary)}<br><br>${escapeHtml(entry.why)}</p>`);
 }
 
+function artifactGuideCard(detail) {
+  const files = Object.keys(detail?.artifacts?.files || {});
+  if (!files.length) return '';
+  const rows = files.map((path) => {
+    const entry = artifactGlossary[path] || {
+      title: '보조 아티팩트',
+      summary: '이 파일은 현재 후보 실행 과정에서 생성된 추가 산출물이다.',
+      why: '필요할 때 raw 내용을 직접 열어 세부 상태를 확인할 수 있다.',
+    };
+    return `
+      <div class="artifact-row">
+        <div class="artifact-path">${escapeHtml(path)}</div>
+        <div class="artifact-title">${escapeHtml(entry.title)}</div>
+        <div class="artifact-copy">${escapeHtml(entry.summary)}</div>
+      </div>
+    `;
+  }).join('');
+  return inspectorCard('아티팩트 전체 설명', `<div class="artifact-guide">${rows}</div>`);
+}
+
 function emptyInspectorHtml() {
   return `
     <div class="empty-state">
       <div class="empty-icon">◎</div>
-      <div class="empty-title">Select a candidate, node, or edge</div>
-      <div class="empty-copy">The inspector will show prompts, JSON contracts, task definitions, and validator artifacts.</div>
+      <div class="empty-title">후보, 노드, 또는 엣지를 선택해줘</div>
+      <div class="empty-copy">Inspector에는 프롬프트, JSON 계약, 태스크 정의, 검증 결과 아티팩트가 표시된다.</div>
     </div>
   `;
 }
@@ -364,7 +409,7 @@ function showCandidateInspector(detail) {
   inspectorContent.classList.remove('empty');
   inspectorContent.innerHTML = `
     <div class="inspector-section">
-      ${inspectorCard('Candidate Summary', `
+      ${inspectorCard('후보 요약', `
         <p><strong>${escapeHtml(detail.name)}</strong> (${escapeHtml(detail.level)})<br>${escapeHtml(detail.mutation_summary)}</p>
         <div class="pills">
           ${pill(`failure ${(Number(detail.failure_rate || 0) * 100).toFixed(0)}%`)}
@@ -372,20 +417,21 @@ function showCandidateInspector(detail) {
           ${pill(detail.archived ? 'archived' : (detail.status || 'generated'))}
         </div>
       `)}
-      ${inspectorCard('Pipeline at a glance', `
+      ${inspectorCard('파이프라인 한눈에 보기', `
         <div class="inspector-grid">
-          ${kv('Agent A', 'build / mutate interpreter')}
-          ${kv('Agent B', 'submit JSON AST program')}
-          ${kv('Validator', 'JSON → AST → execute')}
-          ${kv('Format', 'machine-checkable artifacts')}
+          ${kv('Agent A', '인터프리터 생성 / 변이')}
+          ${kv('Agent B', 'JSON AST 프로그램 제출')}
+          ${kv('Validator', 'JSON → AST → 실행')}
+          ${kv('Format', '기계 검증 가능한 아티팩트')}
         </div>
       `)}
-      ${inspectorCard('What are ast_schema.json and tasks.json?', `
+      ${inspectorCard('ast_schema.json / tasks.json 이란?', `
         <div class="inspector-grid">
-          ${kv('ast_schema.json', 'JSON AST field contract for the solver')}
-          ${kv('tasks.json', 'benchmark task list + expected behavior')}
+          ${kv('ast_schema.json', 'Solver가 따라야 하는 JSON AST 필드 계약')}
+          ${kv('tasks.json', '벤치마크 문제 목록 + 기대 동작')}
         </div>
       `)}
+      ${artifactGuideCard(detail)}
       ${glossaryHtml('language_spec.json')}
       ${inspectorCard('language_spec.json', codeBlock(getArtifact(detail, 'language_spec.json')))}
     </div>
@@ -397,9 +443,9 @@ function showTreeInspector(nodeId, node, tree) {
   inspectorContent.classList.remove('empty');
   inspectorContent.innerHTML = `
     <div class="inspector-section">
-      ${inspectorCard('Strategy Node', `<p><strong>${escapeHtml(node.label || nodeId)}</strong><br>kind: ${escapeHtml(node.kind || '')}<br>status: ${escapeHtml(node.status || '')}${node.score != null ? `<br>score: ${node.score}` : ''}${node.note ? `<br>${escapeHtml(node.note)}` : ''}</p>`)}
-      ${inspectorCard('Selected Path', `<p>${(tree.selected_path || []).map((x) => escapeHtml(x)).join(' → ')}</p>`)}
-      ${detail ? inspectorCard('Current Candidate Strategy Metadata', codeBlock(JSON.stringify({ strategy_family: detail.metadata?.strategy_family, strategy_leaf: detail.metadata?.strategy_leaf }, null, 2))) : ''}
+      ${inspectorCard('전략 노드', `<p><strong>${escapeHtml(node.label || nodeId)}</strong><br>kind: ${escapeHtml(node.kind || '')}<br>status: ${escapeHtml(node.status || '')}${node.score != null ? `<br>score: ${node.score}` : ''}${node.note ? `<br>${escapeHtml(node.note)}` : ''}</p>`)}
+      ${inspectorCard('선택된 경로', `<p>${(tree.selected_path || []).map((x) => escapeHtml(x)).join(' → ')}</p>`)}
+      ${detail ? inspectorCard('현재 후보의 전략 메타데이터', codeBlock(JSON.stringify({ strategy_family: detail.metadata?.strategy_family, strategy_leaf: detail.metadata?.strategy_leaf }, null, 2))) : ''}
     </div>
   `;
 }
@@ -422,9 +468,9 @@ function showNodeInspector(node, graph) {
   inspectorContent.classList.remove('empty');
   inspectorContent.innerHTML = `
     <div class="inspector-section">
-      ${inspectorCard('Selected Node', `<p><strong>${escapeHtml(node.label)}</strong><br>kind: ${escapeHtml(node.kind || '')}<br>status: ${escapeHtml(node.status || '')}</p>`)}
+      ${inspectorCard('선택한 노드', `<p><strong>${escapeHtml(node.label)}</strong><br>kind: ${escapeHtml(node.kind || '')}<br>status: ${escapeHtml(node.status || '')}</p>`)}
       ${glossaryHtml(file)}
-      ${inspectorCard('Relevant Artifact', `<p>${escapeHtml(file)}</p>${codeBlock(getArtifact(detail, file))}`)}
+      ${inspectorCard('연결된 아티팩트', `<p>${escapeHtml(file)}</p>${codeBlock(getArtifact(detail, file))}`)}
     </div>
   `;
 }
@@ -437,9 +483,9 @@ function showEdgeInspector(edge, graph) {
   inspectorContent.classList.remove('empty');
   inspectorContent.innerHTML = `
     <div class="inspector-section">
-      ${inspectorCard('Information Exchange', `<p><strong>${escapeHtml(edge.label || edge.id)}</strong><br>${escapeHtml(edge.source)} → ${escapeHtml(edge.target)}<br>${escapeHtml(edge.exchange || '')}</p>`)}
+      ${inspectorCard('정보 교환 설명', `<p><strong>${escapeHtml(edge.label || edge.id)}</strong><br>${escapeHtml(edge.source)} → ${escapeHtml(edge.target)}<br>${escapeHtml(edge.exchange || '')}</p>`)}
       ${glossaryHtml(inspectPath)}
-      ${inspectorCard('Inspected Artifact', `<p>${escapeHtml(inspectPath)}</p>${codeBlock(preview)}`)}
+      ${inspectorCard('검사 중인 아티팩트', `<p>${escapeHtml(inspectPath)}</p>${codeBlock(preview)}`)}
     </div>
   `;
 }
