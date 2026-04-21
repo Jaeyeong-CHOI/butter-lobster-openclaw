@@ -24,6 +24,25 @@ uv run uvicorn app.main:app --host 127.0.0.1 --port 8787 --reload
 Then open:
 - http://127.0.0.1:8787
 
+## OCaml interpreter runtime
+
+The generated `interpreter.ml` artifacts are intended to be directly executable with OCaml.
+
+### Install runtime on macOS
+```bash
+brew install ocaml
+```
+
+### Run a generated candidate interpreter
+```bash
+cd hardest-language-loop
+./scripts/run_candidate_interpreter.sh <candidate-id>
+# or
+./scripts/run_candidate_interpreter.sh "PL-010 L1"
+```
+
+This executes the candidate's `interpreter.ml` sample program through the local OCaml runtime.
+
 ## Next integration points
 - Replace `generate_candidate()` in `app/engine.py`
 - Replace `simulate_solver()` with real model wrappers + interpreter execution

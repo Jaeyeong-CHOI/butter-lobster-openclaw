@@ -331,14 +331,14 @@ def _interpreter_code(candidate: dict[str, Any]) -> str:
 (* Directly executable OCaml interpreter artifact. *)
 (* Run with: ocaml interpreter.ml *)
 
-type value =
-  | Int of int
-  | Bool of bool
+exception UndefinedSemantics
+
+type id = string
 
 type exp =
   | NUM of int
   | BOOL of bool
-  | VAR of string
+  | VAR of id
   | ADD of exp * exp
   | SUB of exp * exp
   | MUL of exp * exp
@@ -346,22 +346,25 @@ type exp =
   | LESS of exp * exp
   | EQUAL of exp * exp
   | IF of exp * exp * exp
-  | LET of string * exp * exp
-  | LETF of string * string list * exp * exp
-  | CALLV of string * exp list
+  | LET of id * exp * exp
+  | WRITE of exp
+  | LETF of id * id list * exp * exp
+  | CALLV of id * exp list
 
-type env = (string * value) list
+type value =
+  | Int of int
+  | Bool of bool
 
-type func_def = {
-  params : string list;
+type env = (id * value) list
+
+type proc = {
+  params : id list;
   body : exp;
-  closure_env : env;
-  closure_fenv : func_env;
+  penv : env;
+  pfenv : fenv;
 }
 
-and func_env = (string * func_def) list
-
-exception RuntimeError of string
+and fenv = (id * proc) list
 
 __SEMANTICS_COMMENT__
 __KEYWORD_RULE__
@@ -373,40 +376,42 @@ let string_of_value = function
 
 let as_int = function
   | Int n -> n
-  | Bool _ -> raise (RuntimeError "expected integer value")
+  | Bool _ -> raise UndefinedSemantics
 
 let as_bool = function
   | Bool b -> b
   | Int n -> n <> 0
 
-let rec lookup_env name = function
-  | [] -> raise (RuntimeError ("unbound variable: " ^ name))
-  | (k, v) :: tl -> if k = name then v else lookup_env name tl
+let rec lookup x env =
+  match env with
+  | [] -> raise UndefinedSemantics
+  | (y, v) :: rest -> if x = y then v else lookup x rest
 
-let rec lookup_fun name = function
-  | [] -> raise (RuntimeError ("undefined function: " ^ name))
-  | (k, fn) :: tl -> if k = name then fn else lookup_fun name tl
+let rec lookup_fun f fenv =
+  match fenv with
+  | [] -> raise UndefinedSemantics
+  | (g, p) :: rest -> if f = g then p else lookup_fun f rest
 
 let bind_params params values base_env =
   let rec aux ps vs acc =
     match ps, vs with
     | [], [] -> acc
     | p :: ps', v :: vs' -> aux ps' vs' ((p, v) :: acc)
-    | _ -> raise (RuntimeError "arity mismatch in CALLV")
+    | _ -> raise UndefinedSemantics
   in
   aux params values base_env
 
-let rec eval (fenv : func_env) (env : env) (expr : exp) : value =
-  match expr with
+let rec eval (fenv : fenv) (env : env) (e : exp) : value =
+  match e with
   | NUM n -> Int n
   | BOOL b -> Bool b
-  | VAR x -> lookup_env x env
+  | VAR x -> lookup x env
   | ADD (l, r) -> Int (as_int (eval fenv env l) + as_int (eval fenv env r))
   | SUB (l, r) -> Int (as_int (eval fenv env l) - as_int (eval fenv env r))
   | MUL (l, r) -> Int (as_int (eval fenv env l) * as_int (eval fenv env r))
   | DIV (l, r) ->
       let denom = as_int (eval fenv env r) in
-      if denom = 0 then raise (RuntimeError "division by zero")
+      if denom = 0 then raise UndefinedSemantics
       else Int (as_int (eval fenv env l) / denom)
   | LESS (l, r) -> Bool (as_int (eval fenv env l) < as_int (eval fenv env r))
   | EQUAL (l, r) -> Bool (eval fenv env l = eval fenv env r)
@@ -417,45 +422,51 @@ let rec eval (fenv : func_env) (env : env) (expr : exp) : value =
   | LET (name, rhs, body) ->
       let value = eval fenv env rhs in
       eval fenv ((name, value) :: env) body
+  | WRITE expr ->
+      let value = eval fenv env expr in
+      print_endline (string_of_value value);
+      value
   | LETF (name, params, fn_body, in_exp) ->
       let normalized_name = normalize_keyword name in
-      let rec fn = {
+      let rec proc = {
         params = params;
         body = fn_body;
-        closure_env = env;
-        closure_fenv = fn_env;
+        penv = env;
+        pfenv = next_fenv;
       }
-      and fn_env = (normalized_name, fn) :: fenv in
-      eval fn_env env in_exp
+      and next_fenv = (normalized_name, proc) :: fenv in
+      eval next_fenv env in_exp
   | CALLV (name, args) ->
       let normalized_name = normalize_keyword name in
-      let fn = lookup_fun normalized_name fenv in
+      let proc = lookup_fun normalized_name fenv in
       let arg_values = List.map (eval fenv env) args in
-      let call_env = bind_params fn.params arg_values fn.closure_env in
-      eval fn.closure_fenv call_env fn.body
+      let call_env = bind_params proc.params arg_values proc.penv in
+      eval proc.pfenv call_env proc.body
 
-let run_value program = eval [] [] program
+let run e = eval [] [] e
 
-let runb program =
-  match run_value program with
+let runb e =
+  match run e with
   | Int n -> n
   | Bool b -> if b then 1 else 0
 
 let sample_program =
-  LETF (
-    "abs_val",
-    ["x"],
-    IF (
-      LESS (VAR "x", NUM 0),
-      SUB (NUM 0, VAR "x"),
-      VAR "x"
-    ),
-    CALLV ("abs_val", [NUM (-3)])
+  WRITE (
+    LETF (
+      "abs_val",
+      ["x"],
+      IF (
+        LESS (VAR "x", NUM 0),
+        SUB (NUM 0, VAR "x"),
+        VAR "x"
+      ),
+      CALLV ("abs_val", [NUM (-3)])
+    )
   )
 
 let () =
   if not !Sys.interactive then (
-    let result = run_value sample_program in
+    let result = run sample_program in
     Printf.printf "sample_result=%s\n" (string_of_value result)
   )
 """
