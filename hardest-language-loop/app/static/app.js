@@ -34,6 +34,13 @@ const closeSettingsBtn = document.getElementById('closeSettingsBtn');
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 const settingsModal = document.getElementById('settingsModal');
 const settingsBackdrop = document.getElementById('settingsBackdrop');
+const detailModal = document.getElementById('detailModal');
+const detailBackdrop = document.getElementById('detailBackdrop');
+const closeDetailBtn = document.getElementById('closeDetailBtn');
+const detailModalKicker = document.getElementById('detailModalKicker');
+const detailModalTitle = document.getElementById('detailModalTitle');
+const detailModalSubtitle = document.getElementById('detailModalSubtitle');
+const detailModalBody = document.getElementById('detailModalBody');
 const startBtn = document.getElementById('startBtn');
 const pauseBtn = document.getElementById('pauseBtn');
 const stepBtn = document.getElementById('stepBtn');
@@ -80,6 +87,62 @@ const metricGuideEntries = [
   ['모델별 Pass', '각 모델이 모든 반복 시도 중 몇 번 성공했는지 / 전체 시도 수를 뜻한다.'],
   ['Failure rate', '전체 평가 중 실패 비율이다. 높을수록 어려운 언어다.'],
 ];
+
+const metricFormulaDetails = {
+  similarity: {
+    title: 'Similarity 계산 방식',
+    subtitle: 'Python 표면과 얼마나 가까운지를 나타내는 생성 시점 heuristic 점수',
+    formula: [
+      'parent_similarity = 부모 candidate의 similarity_score, 부모가 없으면 0.95',
+      'similarity_raw = parent_similarity + Uniform(-0.08, +0.03)',
+      'similarity = clamp(0.45, 0.98, similarity_raw)',
+    ],
+    notes: [
+      'iteration마다 고정 seed(Random(iteration * 7919))를 사용해서 같은 iteration에서는 재현 가능하다.',
+      '값이 높을수록 Python 문법/표면 구조와 덜 멀어지게 생성된다.',
+      '실제 모델 실행 결과가 아니라 candidate 생성 시점의 구조적 heuristic이다.',
+    ],
+  },
+  conflict: {
+    title: 'Conflict 계산 방식',
+    subtitle: 'Python prior와 얼마나 강하게 충돌하도록 설계됐는지 나타내는 heuristic 점수',
+    formula: [
+      'parent_conflict = 부모 candidate의 conflict_score, 부모가 없으면 0.20',
+      'thinking_bonus = { off:-0.04, low:0.00, medium:+0.03, high:+0.06 }',
+      'conflict_raw = parent_conflict + Uniform(+0.03, +0.15) + thinking_bonus * 0.4 + max(0, agent_a_temperature - 0.4) * 0.05',
+      'conflict = clamp(0.15, 0.98, conflict_raw)',
+    ],
+    notes: [
+      'Agent A thinking이 높고 temperature가 높을수록 prior-breaking mutation이 더 강해지도록 설계되어 있다.',
+      '값이 높을수록 Python에서 익숙한 규칙이 더 많이 깨질 가능성이 높다.',
+    ],
+  },
+  solvable: {
+    title: 'Solvable 계산 방식',
+    subtitle: '규칙을 알면 실제로 풀 수 있는지에 대한 heuristic 점수',
+    formula: [
+      'solvable_raw = 0.92 - abs(conflict - 0.72) * 0.7 + Uniform(-0.08, +0.05)',
+      'solvable = clamp(0.35, 0.97, solvable_raw)',
+    ],
+    notes: [
+      'Conflict가 너무 낮아도 어렵지 않고, 너무 높아도 규칙성이 깨져서 오히려 풀기 어려워질 수 있다고 가정한다.',
+      '그래서 conflict≈0.72 근처일 때 solvable이 가장 높아지도록 설계했다.',
+    ],
+  },
+  novelty: {
+    title: 'Novelty 계산 방식',
+    subtitle: '기존 후보 대비 얼마나 새로운 변형인지에 대한 heuristic 점수',
+    formula: [
+      'thinking_bonus = { off:-0.04, low:0.00, medium:+0.03, high:+0.06 }',
+      'novelty_raw = Uniform(0.35, 0.90) + thinking_bonus * 0.5 + agent_a_temperature * 0.05',
+      'novelty = clamp(0.15, 0.99, novelty_raw)',
+    ],
+    notes: [
+      'Agent A thinking과 temperature가 높을수록 더 낯선 candidate가 나오도록 가중한다.',
+      '현재 novelty도 생성 시점 heuristic이고, embedding 기반 거리 같은 실제 다양성 측정은 아직 아니다.',
+    ],
+  },
+};
 
 async function getJson(url, options = {}) {
   const res = await fetch(url, options);
@@ -150,6 +213,15 @@ function kv(label, value) {
   `;
 }
 
+function kvInteractive(label, value, metricId) {
+  return `
+    <button class="key-value interactive metric-trigger" data-metric-id="${escapeHtml(metricId)}" type="button">
+      <div class="k">${escapeHtml(label)}</div>
+      <div class="v">${escapeHtml(String(value))}</div>
+    </button>
+  `;
+}
+
 function panelEmpty(title, copy) {
   return `
     <div class="empty-state compact">
@@ -169,6 +241,77 @@ function emptyInspectorHtml() {
   `;
 }
 
+function openDetailModal({ kicker = 'Detail', title, subtitle = '', bodyHtml = '' }) {
+  detailModalKicker.textContent = kicker;
+  detailModalTitle.textContent = title;
+  detailModalSubtitle.textContent = subtitle;
+  detailModalBody.innerHTML = bodyHtml;
+  detailModal.classList.remove('hidden');
+  detailModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeDetailModal() {
+  detailModal.classList.add('hidden');
+  detailModal.setAttribute('aria-hidden', 'true');
+}
+
+function openMetricFormulaModal(metricId) {
+  const detail = metricFormulaDetails[metricId];
+  if (!detail) return;
+  const bodyHtml = `
+    <section class="detail-section">
+      <h3>정의</h3>
+      <p>${escapeHtml(detail.subtitle)}</p>
+    </section>
+    <section class="detail-section">
+      <h3>현재 엔진 계산식</h3>
+      <ul>
+        ${detail.formula.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}
+      </ul>
+      <div class="formula-chip-row">
+        <span class="formula-chip">heuristic score</span>
+        <span class="formula-chip">generation-time</span>
+        <span class="formula-chip">deterministic seed + bounded noise</span>
+      </div>
+    </section>
+    <section class="detail-section">
+      <h3>해석할 때 주의할 점</h3>
+      <ul>
+        ${detail.notes.map((line) => `<li>${escapeHtml(line)}</li>`).join('')}
+      </ul>
+    </section>
+  `;
+  openDetailModal({ kicker: 'Metric formula', title: detail.title, subtitle: '현재 engine.py 기준 계산 로직', bodyHtml });
+}
+
+function openArtifactModal({ title, subtitle = '', path = '', content = '', glossaryPath = '' }) {
+  const glossary = artifactGlossary[glossaryPath || path];
+  const bodyHtml = `
+    ${glossary ? `
+      <section class="detail-section">
+        <h3>${escapeHtml(glossary.title)}</h3>
+        <p>${escapeHtml(glossary.summary)}<br><br>${escapeHtml(glossary.why)}</p>
+      </section>
+    ` : ''}
+    <section class="detail-section">
+      <h3>원본 내용</h3>
+      ${path ? `<div class="modal-source-meta">${escapeHtml(path)}</div>` : ''}
+      ${codeBlock(content)}
+    </section>
+  `;
+  openDetailModal({ kicker: 'Source / Artifact', title, subtitle, bodyHtml });
+}
+
+function bindMetricTriggers(scope = document) {
+  scope.querySelectorAll('[data-metric-id]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openMetricFormulaModal(el.dataset.metricId);
+    });
+  });
+}
+
 function glossaryHtml(path) {
   const entry = artifactGlossary[path];
   if (!entry) return '';
@@ -180,12 +323,30 @@ function getArtifact(detail, path) {
 }
 
 function renderMetricGuide() {
-  metricGuide.innerHTML = metricGuideEntries.map(([title, copy]) => `
-    <div class="metric-guide-card">
-      <div class="metric-guide-title">${escapeHtml(title)}</div>
-      <div class="metric-guide-copy">${escapeHtml(copy)}</div>
-    </div>
-  `).join('');
+  const metricMap = {
+    Similarity: 'similarity',
+    Conflict: 'conflict',
+    Solvable: 'solvable',
+    Novelty: 'novelty',
+  };
+  metricGuide.innerHTML = metricGuideEntries.map(([title, copy]) => {
+    const metricId = metricMap[title];
+    if (metricId) {
+      return `
+        <button class="metric-guide-card interactive" data-metric-id="${metricId}" type="button">
+          <div class="metric-guide-title">${escapeHtml(title)}</div>
+          <div class="metric-guide-copy">${escapeHtml(copy)}</div>
+        </button>
+      `;
+    }
+    return `
+      <div class="metric-guide-card">
+        <div class="metric-guide-title">${escapeHtml(title)}</div>
+        <div class="metric-guide-copy">${escapeHtml(copy)}</div>
+      </div>
+    `;
+  }).join('');
+  bindMetricTriggers(metricGuide);
 }
 
 function keyStatusText(status) {
@@ -414,10 +575,10 @@ function renderFocusCard() {
     </div>
     <div class="focus-grid">
       ${kv('Parent', meta.agent1_parent || detail.parent_id || 'None')}
-      ${kv('Similarity', detail.similarity_score ?? '—')}
-      ${kv('Conflict', detail.conflict_score ?? '—')}
-      ${kv('Solvable', detail.solvable_score ?? '—')}
-      ${kv('Novelty', detail.novelty_score ?? '—')}
+      ${kvInteractive('Similarity', detail.similarity_score ?? '—', 'similarity')}
+      ${kvInteractive('Conflict', detail.conflict_score ?? '—', 'conflict')}
+      ${kvInteractive('Solvable', detail.solvable_score ?? '—', 'solvable')}
+      ${kvInteractive('Novelty', detail.novelty_score ?? '—', 'novelty')}
       ${kv('Task Bank', Array.isArray(meta.task_bank) ? meta.task_bank.join(', ') : '—')}
       ${kv('Strategy family', meta.strategy_family || '—')}
       ${kv('Strategy leaf', meta.strategy_leaf || '—')}
@@ -430,6 +591,7 @@ function renderFocusCard() {
       ${kv('진행률', progressText)}
     </div>
   `;
+  bindMetricTriggers(focusCard);
 }
 
 function filteredCandidates() {
@@ -621,7 +783,9 @@ function renderAgentGraph(graph) {
     state.selectedGraphNode = el.dataset.nodeId;
     state.selectedGraphEdge = null;
     renderAgentGraph(graph);
-    showNodeInspector(byId[el.dataset.nodeId]);
+    const node = byId[el.dataset.nodeId];
+    showNodeInspector(node);
+    openGraphNodeModal(node);
   }));
   graphStage.querySelectorAll('.graph-edge-group').forEach((el) => el.addEventListener('click', () => {
     state.selectedGraphEdge = el.dataset.edgeId;
@@ -630,6 +794,35 @@ function renderAgentGraph(graph) {
     const edge = (graph.edges || []).find((item) => item.id === el.dataset.edgeId);
     showEdgeInspector(edge);
   }));
+}
+
+function graphNodeArtifactPath(nodeId) {
+  const pathMap = {
+    strategy_root: 'strategy_tree.json',
+    agent_a: 'prompts/agentA_interpreter_builder.txt',
+    interpreter: 'interpreter.ml',
+    schema: 'ast_schema.json',
+    tasks: 'tasks.json',
+    agent_b: 'prompts/agentB_solver.txt',
+    program: 'program_attempts.json',
+    validator: 'validator_result.json',
+    result: 'validator_result.json',
+  };
+  return pathMap[nodeId] || 'candidate.json';
+}
+
+function openGraphNodeModal(node) {
+  const detail = state.selectedCandidate;
+  if (!detail || !node) return;
+  const file = graphNodeArtifactPath(node.id);
+  const content = getArtifact(detail, file);
+  openArtifactModal({
+    title: node.label || node.id,
+    subtitle: `${node.kind || 'node'} · ${node.status || 'unknown'}`,
+    path: file,
+    content,
+    glossaryPath: file,
+  });
 }
 
 function renderSolverBenchMonitor() {
@@ -735,10 +928,10 @@ function showCandidateInspector(detail) {
       `)}
       ${inspectorCard('지표 해석', `
         <div class="inspector-grid">
-          ${kv('Similarity', 'Python 표면과의 유사도')}
-          ${kv('Conflict', 'Python prior와의 충돌 강도')}
-          ${kv('Solvable', '규칙을 따르면 풀 수 있는 정도')}
-          ${kv('Novelty', '기존 후보 대비 새로움')}
+          ${kvInteractive('Similarity', '계산식 보기', 'similarity')}
+          ${kvInteractive('Conflict', '계산식 보기', 'conflict')}
+          ${kvInteractive('Solvable', '계산식 보기', 'solvable')}
+          ${kvInteractive('Novelty', '계산식 보기', 'novelty')}
         </div>
       `)}
       ${inspectorCard('Solver Bench 설정', `
@@ -755,6 +948,7 @@ function showCandidateInspector(detail) {
       ${rawDetails('language_spec.json raw 보기', getArtifact(detail, 'language_spec.json'))}
     </div>
   `;
+  bindMetricTriggers(inspectorContent);
 }
 
 function showTreeInspector(nodeId, node, tree) {
@@ -771,18 +965,7 @@ function showTreeInspector(nodeId, node, tree) {
 function showNodeInspector(node) {
   const detail = state.selectedCandidate;
   if (!detail || !node) return;
-  const pathMap = {
-    strategy_root: 'strategy_tree.json',
-    agent_a: 'prompts/agentA_interpreter_builder.txt',
-    interpreter: 'interpreter.ml',
-    schema: 'ast_schema.json',
-    tasks: 'tasks.json',
-    agent_b: 'prompts/agentB_solver.txt',
-    program: 'program_attempts.json',
-    validator: 'validator_result.json',
-    result: 'validator_result.json',
-  };
-  const file = pathMap[node.id] || 'candidate.json';
+  const file = graphNodeArtifactPath(node.id);
   inspectorContent.classList.remove('empty');
   inspectorContent.innerHTML = `
     <div class="inspector-section">
@@ -900,6 +1083,8 @@ archivedOnlyInput.addEventListener('change', (e) => {
 openSettingsBtn.addEventListener('click', openSettingsModal);
 closeSettingsBtn.addEventListener('click', closeSettingsModal);
 settingsBackdrop.addEventListener('click', closeSettingsModal);
+closeDetailBtn.addEventListener('click', closeDetailModal);
+detailBackdrop.addEventListener('click', closeDetailModal);
 openaiClearKeyBtn.addEventListener('click', async () => {
   await clearOpenAIKey();
 });
@@ -914,7 +1099,9 @@ saveSettingsBtn.addEventListener('click', async () => {
 });
 
 document.addEventListener('keydown', (event) => {
-  if (event.key === 'Escape' && !settingsModal.classList.contains('hidden')) closeSettingsModal();
+  if (event.key !== 'Escape') return;
+  if (!settingsModal.classList.contains('hidden')) closeSettingsModal();
+  if (!detailModal.classList.contains('hidden')) closeDetailModal();
 });
 
 startBtn.addEventListener('click', () => post('/api/loop/start'));

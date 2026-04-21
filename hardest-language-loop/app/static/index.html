@@ -256,6 +256,21 @@
       </section>
     </div>
 
+    <div id="detailModal" class="detail-modal-shell hidden" aria-hidden="true">
+      <div id="detailBackdrop" class="detail-backdrop"></div>
+      <section class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="detailModalTitle">
+        <div class="detail-modal-head">
+          <div>
+            <div id="detailModalKicker" class="eyebrow">Detail</div>
+            <h2 id="detailModalTitle">상세 정보</h2>
+            <p id="detailModalSubtitle" class="settings-modal-copy"></p>
+          </div>
+          <button id="closeDetailBtn" class="secondary">닫기</button>
+        </div>
+        <div id="detailModalBody" class="detail-modal-body"></div>
+      </section>
+    </div>
+
     <script src="/static/app.js"></script>
   </body>
 </html>
