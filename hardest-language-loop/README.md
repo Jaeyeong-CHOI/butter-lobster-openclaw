@@ -43,7 +43,15 @@ cd hardest-language-loop
 
 This executes the candidate's `interpreter.ml` sample program through the local OCaml runtime.
 
+### Run the JSON AST validator bridge for a candidate
+```bash
+cd hardest-language-loop
+./scripts/run_candidate_validator.sh <candidate-id>
+```
+
+This regenerates the candidate bundle, converts `program_attempts.json` JSON AST into OCaml AST expressions, executes them through the candidate interpreter, and prints `validator_result.json`.
+
 ## Next integration points
 - Replace `generate_candidate()` in `app/engine.py`
 - Replace `simulate_solver()` with real model wrappers + interpreter execution
-- Add candidate folder artifact writer (`spec.md`, `interpreter.py`, `tasks.json`)
+- Wire real Agent B model output into `program_attempts.json`

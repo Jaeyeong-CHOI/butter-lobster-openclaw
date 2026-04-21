@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -21,33 +24,327 @@ def _task_bank(candidate: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         {
             "task_name": "abs",
+            "entry_name": "abs_val",
+            "params": ["x"],
             "prompt": "Implement abs_val(x)",
             "category": "neutral",
             "expected_behavior": "Return the absolute value of x.",
             "reason": "Sanity-check for JSON AST generation and interpreter execution.",
+            "tests": [
+                {"args": [-3], "expected": 3},
+                {"args": [0], "expected": 0},
+                {"args": [5], "expected": 5},
+            ],
         },
         {
             "task_name": "max",
+            "entry_name": "max_val",
+            "params": ["a", "b"],
             "prompt": "Implement max_val(a, b)",
             "category": "neutral",
             "expected_behavior": "Return the larger of two values.",
             "reason": "Low-entrenchment control task.",
+            "tests": [
+                {"args": [3, 5], "expected": 5},
+                {"args": [9, 2], "expected": 9},
+                {"args": [4, 4], "expected": 4},
+            ],
         },
         {
             "task_name": "fib",
+            "entry_name": "fib",
+            "params": ["n"],
             "prompt": "Implement fib(n)",
             "category": "prior-entrenched",
             "expected_behavior": f"Implement Fibonacci under candidate semantics. {semantics}",
             "reason": "Canonical prior-entrenched task.",
+            "tests": [
+                {"args": [0], "expected": 0},
+                {"args": [1], "expected": 1},
+                {"args": [6], "expected": 8},
+            ],
         },
         {
             "task_name": "gcd",
+            "entry_name": "gcd",
+            "params": ["a", "b"],
             "prompt": "Implement gcd(a, b)",
             "category": "prior-entrenched",
             "expected_behavior": f"Implement Euclidean GCD under candidate semantics. {semantics}",
             "reason": "Second canonical prior-entrenched task.",
+            "tests": [
+                {"args": [12, 8], "expected": 4},
+                {"args": [9, 6], "expected": 3},
+                {"args": [7, 7], "expected": 7},
+            ],
         },
     ]
+
+
+INVERTED_IF_LEVELS = {"L3", "L4", "L5"}
+
+
+def _num(n: int) -> dict[str, Any]:
+    return {"type": "NUM", "value": n}
+
+
+def _bool(value: bool) -> dict[str, Any]:
+    return {"type": "BOOL", "value": value}
+
+
+def _var(name: str) -> dict[str, Any]:
+    return {"type": "VAR", "name": name}
+
+
+def _call(name: str, args: list[dict[str, Any]]) -> dict[str, Any]:
+    return {"type": "CALLV", "name": name, "args": args}
+
+
+def _binary(op: str, left: dict[str, Any], right: dict[str, Any]) -> dict[str, Any]:
+    return {"type": op, "left": left, "right": right}
+
+
+def _if_expr(level: str, cond: dict[str, Any], then_expr: dict[str, Any], else_expr: dict[str, Any]) -> dict[str, Any]:
+    if level in INVERTED_IF_LEVELS:
+        return {"type": "IF", "cond": cond, "then": else_expr, "else": then_expr}
+    return {"type": "IF", "cond": cond, "then": then_expr, "else": else_expr}
+
+
+def _task_body(task_name: str, level: str, success: bool) -> tuple[str, list[str], dict[str, Any]]:
+    if task_name == "abs":
+        if success:
+            body = _if_expr(level, _binary("LESS", _var("x"), _num(0)), _binary("SUB", _num(0), _var("x")), _var("x"))
+        else:
+            body = _var("x")
+        return "abs_val", ["x"], body
+
+    if task_name == "max":
+        if success:
+            body = _if_expr(level, _binary("LESS", _var("a"), _var("b")), _var("b"), _var("a"))
+        else:
+            body = _var("a")
+        return "max_val", ["a", "b"], body
+
+    if task_name == "fib":
+        if success:
+            body = _if_expr(
+                level,
+                _binary("LESS", _var("n"), _num(2)),
+                _var("n"),
+                _binary(
+                    "ADD",
+                    _call("fib", [_binary("SUB", _var("n"), _num(1))]),
+                    _call("fib", [_binary("SUB", _var("n"), _num(2))]),
+                ),
+            )
+        else:
+            body = _var("n")
+        return "fib", ["n"], body
+
+    if task_name == "gcd":
+        if success:
+            body = _if_expr(
+                level,
+                _binary("EQUAL", _var("a"), _var("b")),
+                _var("a"),
+                _if_expr(
+                    level,
+                    _binary("LESS", _var("a"), _var("b")),
+                    _call("gcd", [_var("a"), _binary("SUB", _var("b"), _var("a"))]),
+                    _call("gcd", [_binary("SUB", _var("a"), _var("b")), _var("b")]),
+                ),
+            )
+        else:
+            body = _var("a")
+        return "gcd", ["a", "b"], body
+
+    raise ValueError(f"Unknown task: {task_name}")
+
+
+def _build_task_program(candidate: dict[str, Any], task: dict[str, Any], success: bool) -> dict[str, Any]:
+    level = candidate.get("level", "L3")
+    entry_name, params, body = _task_body(task["task_name"], level, success)
+    first_case_args = task.get("tests", [{"args": []}])[0]["args"]
+    return {
+        "type": "LETF",
+        "name": entry_name,
+        "params": params,
+        "body": body,
+        "in": _call(entry_name, [_num(arg) for arg in first_case_args]),
+    }
+
+
+def _validate_json_ast(node: Any, path: str = "program") -> list[str]:
+    if not isinstance(node, dict):
+        return [f"{path}: node must be an object"]
+    node_type = node.get("type")
+    if not isinstance(node_type, str):
+        return [f"{path}: missing string field 'type'"]
+
+    errors: list[str] = []
+    if node_type == "NUM":
+        if not isinstance(node.get("value"), int):
+            errors.append(f"{path}: NUM.value must be an integer")
+    elif node_type == "BOOL":
+        if not isinstance(node.get("value"), bool):
+            errors.append(f"{path}: BOOL.value must be a boolean")
+    elif node_type == "VAR":
+        if not isinstance(node.get("name"), str):
+            errors.append(f"{path}: VAR.name must be a string")
+    elif node_type in {"ADD", "SUB", "MUL", "DIV", "LESS", "EQUAL"}:
+        errors.extend(_validate_json_ast(node.get("left"), f"{path}.left"))
+        errors.extend(_validate_json_ast(node.get("right"), f"{path}.right"))
+    elif node_type == "IF":
+        errors.extend(_validate_json_ast(node.get("cond"), f"{path}.cond"))
+        errors.extend(_validate_json_ast(node.get("then"), f"{path}.then"))
+        errors.extend(_validate_json_ast(node.get("else"), f"{path}.else"))
+    elif node_type == "LET":
+        if not isinstance(node.get("name"), str):
+            errors.append(f"{path}: LET.name must be a string")
+        errors.extend(_validate_json_ast(node.get("value"), f"{path}.value"))
+        errors.extend(_validate_json_ast(node.get("body"), f"{path}.body"))
+    elif node_type == "WRITE":
+        errors.extend(_validate_json_ast(node.get("expr"), f"{path}.expr"))
+    elif node_type == "LETF":
+        if not isinstance(node.get("name"), str):
+            errors.append(f"{path}: LETF.name must be a string")
+        params = node.get("params")
+        if not isinstance(params, list) or not all(isinstance(p, str) for p in params):
+            errors.append(f"{path}: LETF.params must be a list of strings")
+        errors.extend(_validate_json_ast(node.get("body"), f"{path}.body"))
+        errors.extend(_validate_json_ast(node.get("in"), f"{path}.in"))
+    elif node_type == "CALLV":
+        if not isinstance(node.get("name"), str):
+            errors.append(f"{path}: CALLV.name must be a string")
+        args = node.get("args")
+        if not isinstance(args, list):
+            errors.append(f"{path}: CALLV.args must be a list")
+        else:
+            for i, arg in enumerate(args):
+                errors.extend(_validate_json_ast(arg, f"{path}.args[{i}]"))
+    else:
+        errors.append(f"{path}: unsupported node type '{node_type}'")
+    return errors
+
+
+def _ocaml_string(value: str) -> str:
+    return json.dumps(value)
+
+
+def _json_ast_to_ocaml(node: dict[str, Any]) -> str:
+    node_type = node["type"]
+    if node_type == "NUM":
+        value = int(node["value"])
+        return f"NUM ({value})" if value < 0 else f"NUM {value}"
+    if node_type == "BOOL":
+        return "BOOL true" if node["value"] else "BOOL false"
+    if node_type == "VAR":
+        return f"VAR {_ocaml_string(node['name'])}"
+    if node_type in {"ADD", "SUB", "MUL", "DIV", "LESS", "EQUAL"}:
+        return f"{node_type} ({_json_ast_to_ocaml(node['left'])}, {_json_ast_to_ocaml(node['right'])})"
+    if node_type == "IF":
+        return f"IF ({_json_ast_to_ocaml(node['cond'])}, {_json_ast_to_ocaml(node['then'])}, {_json_ast_to_ocaml(node['else'])})"
+    if node_type == "LET":
+        return f"LET ({_ocaml_string(node['name'])}, {_json_ast_to_ocaml(node['value'])}, {_json_ast_to_ocaml(node['body'])})"
+    if node_type == "WRITE":
+        return f"WRITE ({_json_ast_to_ocaml(node['expr'])})"
+    if node_type == "LETF":
+        params = "; ".join(_ocaml_string(param) for param in node["params"])
+        return (
+            f"LETF ({_ocaml_string(node['name'])}, [{params}], "
+            f"{_json_ast_to_ocaml(node['body'])}, {_json_ast_to_ocaml(node['in'])})"
+        )
+    if node_type == "CALLV":
+        args = "; ".join(_json_ast_to_ocaml(arg) for arg in node.get("args", []))
+        return f"CALLV ({_ocaml_string(node['name'])}, [{args}])"
+    raise ValueError(f"Unsupported node type: {node_type}")
+
+
+def _program_with_args(program: dict[str, Any], entry_name: str, args: list[int]) -> dict[str, Any]:
+    if program.get("type") == "LETF":
+        return {
+            **program,
+            "in": _call(entry_name, [_num(int(arg)) for arg in args]),
+        }
+    return program
+
+
+def _execute_ocaml_cases(interpreter_source: str, case_programs: list[dict[str, Any]]) -> dict[str, Any]:
+    ocaml_bin = shutil.which("ocaml")
+    if not ocaml_bin:
+        return {
+            "execution_ok": False,
+            "notes": "ocaml runtime not found",
+            "cases": [],
+        }
+
+    case_lines = []
+    for index, case in enumerate(case_programs, start=1):
+        expr = _json_ast_to_ocaml(case["program"])
+        case_lines.append(
+            f"  (\"case_{index}\", {expr}, {int(case['expected'])});"
+        )
+
+    driver = f"""
+{interpreter_source}
+
+let validator_cases = [
+{chr(10).join(case_lines)}
+]
+
+let () =
+  List.iter
+    (fun (label, program, expected) ->
+      let result = runb program in
+      Printf.printf "__CASE__=%s|%d|%d\\n" label result expected)
+    validator_cases
+"""
+
+    with tempfile.NamedTemporaryFile("w", suffix=".ml", delete=False, encoding="utf-8") as tmp:
+        tmp.write(driver)
+        tmp_path = Path(tmp.name)
+
+    try:
+        proc = subprocess.run(
+            [ocaml_bin, str(tmp_path)],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        tmp_path.unlink(missing_ok=True)
+        return {"execution_ok": False, "notes": "ocaml execution timed out", "cases": []}
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    if proc.returncode != 0:
+        return {
+            "execution_ok": False,
+            "notes": (proc.stderr or proc.stdout or "ocaml execution failed").strip(),
+            "cases": [],
+        }
+
+    case_results = []
+    for line in proc.stdout.splitlines():
+        if not line.startswith("__CASE__="):
+            continue
+        _, payload = line.split("=", 1)
+        label, actual, expected = payload.split("|", 2)
+        case_results.append(
+            {
+                "label": label,
+                "actual": int(actual),
+                "expected": int(expected),
+                "match": int(actual) == int(expected),
+            }
+        )
+
+    return {
+        "execution_ok": True,
+        "notes": "",
+        "cases": case_results,
+        "stdout": [line for line in proc.stdout.splitlines() if not line.startswith("__CASE__=")],
+    }
 
 
 def _strategy_tree(candidate: dict[str, Any], parent_name: str | None) -> dict[str, Any]:
@@ -465,7 +762,7 @@ let sample_program =
   )
 
 let () =
-  if not !Sys.interactive then (
+  if not !Sys.interactive && Sys.getenv_opt "HLL_RUN_SAMPLE" = Some "1" then (
     let result = run sample_program in
     Printf.printf "sample_result=%s\n" (string_of_value result)
   )
@@ -487,19 +784,36 @@ def _ast_schema(candidate: dict[str, Any]) -> dict[str, Any]:
         "required_top_level": ["program"],
         "node_examples": {
             "NUM": {"type": "NUM", "value": 3},
+            "BOOL": {"type": "BOOL", "value": True},
             "VAR": {"type": "VAR", "name": "x"},
             "ADD": {"type": "ADD", "left": {"type": "NUM", "value": 1}, "right": {"type": "NUM", "value": 2}},
+            "WRITE": {"type": "WRITE", "expr": {"type": "NUM", "value": 3}},
             "IF": {
                 "type": "IF",
                 "cond": {"type": "LESS", "left": {"type": "VAR", "name": "n"}, "right": {"type": "NUM", "value": 2}},
                 "then": {"type": "VAR", "name": "n"},
                 "else": {"type": "NUM", "value": 0},
             },
+            "LET": {
+                "type": "LET",
+                "name": "x",
+                "value": {"type": "NUM", "value": 3},
+                "body": {"type": "ADD", "left": {"type": "VAR", "name": "x"}, "right": {"type": "NUM", "value": 1}},
+            },
             "LETF": {
                 "type": "LETF",
                 "name": "fib",
                 "params": ["n"],
-                "body": {"type": "NUM", "value": 0},
+                "body": {
+                    "type": "IF",
+                    "cond": {"type": "LESS", "left": {"type": "VAR", "name": "n"}, "right": {"type": "NUM", "value": 2}},
+                    "then": {"type": "VAR", "name": "n"},
+                    "else": {
+                        "type": "ADD",
+                        "left": {"type": "CALLV", "name": "fib", "args": [{"type": "SUB", "left": {"type": "VAR", "name": "n"}, "right": {"type": "NUM", "value": 1}}]},
+                        "right": {"type": "CALLV", "name": "fib", "args": [{"type": "SUB", "left": {"type": "VAR", "name": "n"}, "right": {"type": "NUM", "value": 2}}]},
+                    },
+                },
                 "in": {"type": "CALLV", "name": "fib", "args": [{"type": "NUM", "value": 6}]},
             },
         },
@@ -507,34 +821,38 @@ def _ast_schema(candidate: dict[str, Any]) -> dict[str, Any]:
             "Agent B must output JSON only.",
             "The validator will reject malformed or schema-incompatible programs.",
             "Surface syntax is optional; JSON AST is canonical for v1.",
+            "LET nodes use fields {name, value, body}; WRITE nodes use {expr}.",
         ],
     }
 
 
-def _program_attempts(candidate: dict[str, Any], evaluations: list[dict[str, Any]] | None) -> dict[str, Any]:
+def _program_attempts(candidate: dict[str, Any], evaluations: list[dict[str, Any]] | None, tasks: list[dict[str, Any]]) -> dict[str, Any]:
     rows = evaluations or []
+    task_map = {task["task_name"]: task for task in tasks}
+    fallback_model = ((candidate.get("metadata", {}) or {}).get("agent_b_model") or "gpt-5.4")
+    if not rows:
+        rows = [
+            {
+                "task_name": task["task_name"],
+                "model_name": fallback_model,
+                "success": True,
+            }
+            for task in tasks
+        ]
     attempts = []
     for row in rows:
         task = row["task_name"]
+        task_info = task_map[task]
+        expected_success = bool(row.get("success", True))
         prog = {
             "format": "json_ast_v1",
             "task_name": task,
+            "entry_name": task_info["entry_name"],
+            "params": task_info["params"],
             "model_name": row["model_name"],
-            "program": {
-                "type": "LETF",
-                "name": task,
-                "params": ["x", "y"] if task in {"max", "gcd"} else ["n"],
-                "body": {
-                    "type": "IF" if candidate.get("level") in {"L3", "L4", "L5"} else "ADD",
-                    "note": "MVP placeholder AST; replace with real Agent B output",
-                },
-                "in": {
-                    "type": "CALLV",
-                    "name": task,
-                    "args": [{"type": "NUM", "value": 6}],
-                },
-            },
-            "expected_success": bool(row.get("success")),
+            "program": _build_task_program(candidate, task_info, expected_success),
+            "tests": task_info["tests"],
+            "expected_success": expected_success,
         }
         attempts.append(prog)
     return {
@@ -544,8 +862,63 @@ def _program_attempts(candidate: dict[str, Any], evaluations: list[dict[str, Any
     }
 
 
-def _validator_result(candidate: dict[str, Any], evaluations: list[dict[str, Any]] | None, analysis: dict[str, Any] | None) -> dict[str, Any]:
-    rows = evaluations or []
+def _validator_result(
+    candidate: dict[str, Any],
+    program_attempts: dict[str, Any],
+    interpreter_source: str,
+    analysis: dict[str, Any] | None,
+) -> dict[str, Any]:
+    rows = []
+    for attempt in program_attempts.get("attempts", []):
+        parse_errors = _validate_json_ast(attempt.get("program"), path=f"{attempt['task_name']}.program")
+        if parse_errors:
+            rows.append(
+                {
+                    "model_name": attempt["model_name"],
+                    "task_name": attempt["task_name"],
+                    "parse_ok": False,
+                    "execution_ok": False,
+                    "outputs_match": False,
+                    "success": False,
+                    "score": 0.0,
+                    "notes": "; ".join(parse_errors),
+                    "cases": [],
+                    "expected_success": attempt.get("expected_success", True),
+                }
+            )
+            continue
+
+        case_programs = [
+            {
+                "program": _program_with_args(attempt["program"], attempt["entry_name"], case["args"]),
+                "expected": case["expected"],
+            }
+            for case in attempt.get("tests", [])
+        ]
+        execution = _execute_ocaml_cases(interpreter_source, case_programs)
+        case_results = execution.get("cases", [])
+        outputs_match = bool(case_results) and all(case.get("match") for case in case_results)
+        success = execution.get("execution_ok", False) and outputs_match
+        score = round(sum(1 for case in case_results if case.get("match")) / len(case_results), 3) if case_results else 0.0
+        notes = execution.get("notes", "")
+        if success != bool(attempt.get("expected_success", True)):
+            notes = (notes + " | " if notes else "") + "execution result differs from simulated solver label"
+        rows.append(
+            {
+                "model_name": attempt["model_name"],
+                "task_name": attempt["task_name"],
+                "parse_ok": True,
+                "execution_ok": execution.get("execution_ok", False),
+                "outputs_match": outputs_match,
+                "success": success,
+                "score": score,
+                "notes": notes,
+                "cases": case_results,
+                "expected_success": attempt.get("expected_success", True),
+            }
+        )
+
+    actual_failure_rate = (sum(1 for row in rows if not row.get("success")) / len(rows)) if rows else 0.0
     return {
         "candidate_id": candidate["id"],
         "validator_mode": "json -> schema check -> AST reconstruction -> interpreter execution -> output comparison",
@@ -553,21 +926,10 @@ def _validator_result(candidate: dict[str, Any], evaluations: list[dict[str, Any
             "total_evaluations": len(rows),
             "total_success": sum(1 for r in rows if r.get("success")),
             "total_failure": sum(1 for r in rows if not r.get("success")),
-            "failure_rate": analysis.get("failure_rate") if analysis else candidate.get("failure_rate", 0.0),
+            "failure_rate": round(actual_failure_rate, 3),
+            "reference_failure_rate": analysis.get("failure_rate") if analysis else candidate.get("failure_rate", 0.0),
         },
-        "rows": [
-            {
-                "model_name": r["model_name"],
-                "task_name": r["task_name"],
-                "parse_ok": True,
-                "execution_ok": True,
-                "outputs_match": bool(r["success"]),
-                "success": bool(r["success"]),
-                "score": r["score"],
-                "notes": r.get("notes", ""),
-            }
-            for r in rows
-        ],
+        "rows": rows,
     }
 
 
@@ -643,19 +1005,21 @@ def materialize_candidate_bundle(
     candidate_dir = CANDIDATE_ROOT / candidate["id"]
     candidate_dir.mkdir(parents=True, exist_ok=True)
 
+    tasks = _task_bank(candidate)
+    interpreter_source = _interpreter_code(candidate)
     language_spec = _language_spec(candidate, parent_name)
     ast_schema = _ast_schema(candidate)
-    program_attempts = _program_attempts(candidate, evaluations)
-    validator_result = _validator_result(candidate, evaluations, analysis)
+    program_attempts = _program_attempts(candidate, evaluations, tasks)
+    validator_result = _validator_result(candidate, program_attempts, interpreter_source, analysis)
     strategy_tree = _strategy_tree(candidate, parent_name)
     agent_graph = _agent_graph(candidate)
 
     files: dict[str, str] = {
         "spec.md": _spec_markdown(candidate, parent_name),
-        "interpreter.ml": _interpreter_code(candidate),
+        "interpreter.ml": interpreter_source,
         "language_spec.json": json.dumps(language_spec, ensure_ascii=False, indent=2),
         "ast_schema.json": json.dumps(ast_schema, ensure_ascii=False, indent=2),
-        "tasks.json": json.dumps(_task_bank(candidate), ensure_ascii=False, indent=2),
+        "tasks.json": json.dumps(tasks, ensure_ascii=False, indent=2),
         "strategy_tree.json": json.dumps(strategy_tree, ensure_ascii=False, indent=2),
         "agent_graph.json": json.dumps(agent_graph, ensure_ascii=False, indent=2),
         "program_attempts.json": json.dumps(program_attempts, ensure_ascii=False, indent=2),

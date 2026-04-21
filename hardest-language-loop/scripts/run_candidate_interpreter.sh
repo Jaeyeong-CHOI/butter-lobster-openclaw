@@ -56,4 +56,4 @@ fi
 
 echo "[info] ocaml version: $(ocaml -version 2>/dev/null | head -n 1)"
 echo "[info] running: $INTERPRETER_PATH"
-ocaml "$INTERPRETER_PATH"
+HLL_RUN_SAMPLE=1 ocaml "$INTERPRETER_PATH"
