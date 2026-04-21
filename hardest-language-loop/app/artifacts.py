@@ -287,24 +287,185 @@ def _spec_markdown(candidate: dict[str, Any], parent_name: str | None) -> str:
 
 def _interpreter_code(candidate: dict[str, Any]) -> str:
     level = candidate.get("level", "L3")
-    body = {
-        "L1": "(* token-conflict language: conflicting keywords are normalized before evaluation *)\nlet normalize_keyword k = match k with | \"fn\" -> \"def\" | \"unless\" -> \"if\" | _ -> k",
-        "L2": "(* syntax-conflict language: blocks and declarations are reshaped before execution *)\n(* Example: :define name [args] -> becomes an internal function declaration node *)",
-        "L3": "(* semantic-conflict language: conditionals execute when condition is FALSE *)\nlet eval_if cond = not cond",
-        "L4": "(* implicit semantic language: runtime matches inverted-if, but prompts never verbalize the rule *)\nlet eval_if cond = not cond",
-        "L5": "(* compound conflict: keyword remap + syntax reshape + inverted conditionals *)\nlet normalize_keyword k = match k with | \"fn\" -> \"def\" | \"give\" -> \"return\" | _ -> k\nlet eval_if cond = not cond",
-        "Seed": "(* canonical Python-like reference interpreter *)\nlet eval_if cond = cond",
-    }.get(level, "(* interpreter stub *)")
-    return f"""(* interpreter.ml for {candidate['name']} *)
-(* This executable interpreter is the canonical source of truth for the language. *)
+    semantics = {
+        "L1": {
+            "comment": "(* token-conflict language: conflicting surface keywords are normalized before function lookup *)",
+            "keyword_rule": "let normalize_keyword k = match k with | \"fn\" -> \"def\" | \"unless\" -> \"if\" | _ -> k",
+            "if_rule": "let eval_if cond = cond",
+        },
+        "L2": {
+            "comment": "(* syntax-conflict language: surface syntax is assumed to be normalized into the AST before evaluation *)",
+            "keyword_rule": "let normalize_keyword k = k",
+            "if_rule": "let eval_if cond = cond",
+        },
+        "L3": {
+            "comment": "(* semantic-conflict language: IF executes its then-branch when the condition evaluates to FALSE *)",
+            "keyword_rule": "let normalize_keyword k = k",
+            "if_rule": "let eval_if cond = not cond",
+        },
+        "L4": {
+            "comment": "(* implicit semantic language: the runtime inverts IF, but the rule is meant to be inferred from behavior/examples *)",
+            "keyword_rule": "let normalize_keyword k = k",
+            "if_rule": "let eval_if cond = not cond",
+        },
+        "L5": {
+            "comment": "(* compound conflict language: keyword remap + inverted IF semantics are both active in the runtime *)",
+            "keyword_rule": "let normalize_keyword k = match k with | \"fn\" -> \"def\" | \"give\" -> \"return\" | _ -> k",
+            "if_rule": "let eval_if cond = not cond",
+        },
+        "Seed": {
+            "comment": "(* canonical Python-like baseline interpreter *)",
+            "keyword_rule": "let normalize_keyword k = k",
+            "if_rule": "let eval_if cond = cond",
+        },
+    }.get(
+        level,
+        {
+            "comment": "(* default interpreter semantics *)",
+            "keyword_rule": "let normalize_keyword k = k",
+            "if_rule": "let eval_if cond = cond",
+        },
+    )
 
-exception UndefinedSemantics
+    template = """(* interpreter.ml for __NAME__ *)
+(* Directly executable OCaml interpreter artifact. *)
+(* Run with: ocaml interpreter.ml *)
 
-{body}
+type value =
+  | Int of int
+  | Bool of bool
 
-(* TODO: replace with the real HW3/B-language-derived interpreter body. *)
-(* Expected execution path: program.json -> AST -> eval -> output trace *)
+type exp =
+  | NUM of int
+  | BOOL of bool
+  | VAR of string
+  | ADD of exp * exp
+  | SUB of exp * exp
+  | MUL of exp * exp
+  | DIV of exp * exp
+  | LESS of exp * exp
+  | EQUAL of exp * exp
+  | IF of exp * exp * exp
+  | LET of string * exp * exp
+  | LETF of string * string list * exp * exp
+  | CALLV of string * exp list
+
+type env = (string * value) list
+
+type func_def = {
+  params : string list;
+  body : exp;
+  closure_env : env;
+  closure_fenv : func_env;
+}
+
+and func_env = (string * func_def) list
+
+exception RuntimeError of string
+
+__SEMANTICS_COMMENT__
+__KEYWORD_RULE__
+__IF_RULE__
+
+let string_of_value = function
+  | Int n -> string_of_int n
+  | Bool b -> string_of_bool b
+
+let as_int = function
+  | Int n -> n
+  | Bool _ -> raise (RuntimeError "expected integer value")
+
+let as_bool = function
+  | Bool b -> b
+  | Int n -> n <> 0
+
+let rec lookup_env name = function
+  | [] -> raise (RuntimeError ("unbound variable: " ^ name))
+  | (k, v) :: tl -> if k = name then v else lookup_env name tl
+
+let rec lookup_fun name = function
+  | [] -> raise (RuntimeError ("undefined function: " ^ name))
+  | (k, fn) :: tl -> if k = name then fn else lookup_fun name tl
+
+let bind_params params values base_env =
+  let rec aux ps vs acc =
+    match ps, vs with
+    | [], [] -> acc
+    | p :: ps', v :: vs' -> aux ps' vs' ((p, v) :: acc)
+    | _ -> raise (RuntimeError "arity mismatch in CALLV")
+  in
+  aux params values base_env
+
+let rec eval (fenv : func_env) (env : env) (expr : exp) : value =
+  match expr with
+  | NUM n -> Int n
+  | BOOL b -> Bool b
+  | VAR x -> lookup_env x env
+  | ADD (l, r) -> Int (as_int (eval fenv env l) + as_int (eval fenv env r))
+  | SUB (l, r) -> Int (as_int (eval fenv env l) - as_int (eval fenv env r))
+  | MUL (l, r) -> Int (as_int (eval fenv env l) * as_int (eval fenv env r))
+  | DIV (l, r) ->
+      let denom = as_int (eval fenv env r) in
+      if denom = 0 then raise (RuntimeError "division by zero")
+      else Int (as_int (eval fenv env l) / denom)
+  | LESS (l, r) -> Bool (as_int (eval fenv env l) < as_int (eval fenv env r))
+  | EQUAL (l, r) -> Bool (eval fenv env l = eval fenv env r)
+  | IF (cond, then_e, else_e) ->
+      if eval_if (as_bool (eval fenv env cond))
+      then eval fenv env then_e
+      else eval fenv env else_e
+  | LET (name, rhs, body) ->
+      let value = eval fenv env rhs in
+      eval fenv ((name, value) :: env) body
+  | LETF (name, params, fn_body, in_exp) ->
+      let normalized_name = normalize_keyword name in
+      let rec fn = {
+        params = params;
+        body = fn_body;
+        closure_env = env;
+        closure_fenv = fn_env;
+      }
+      and fn_env = (normalized_name, fn) :: fenv in
+      eval fn_env env in_exp
+  | CALLV (name, args) ->
+      let normalized_name = normalize_keyword name in
+      let fn = lookup_fun normalized_name fenv in
+      let arg_values = List.map (eval fenv env) args in
+      let call_env = bind_params fn.params arg_values fn.closure_env in
+      eval fn.closure_fenv call_env fn.body
+
+let run_value program = eval [] [] program
+
+let runb program =
+  match run_value program with
+  | Int n -> n
+  | Bool b -> if b then 1 else 0
+
+let sample_program =
+  LETF (
+    "abs_val",
+    ["x"],
+    IF (
+      LESS (VAR "x", NUM 0),
+      SUB (NUM 0, VAR "x"),
+      VAR "x"
+    ),
+    CALLV ("abs_val", [NUM (-3)])
+  )
+
+let () =
+  if not !Sys.interactive then (
+    let result = run_value sample_program in
+    Printf.printf "sample_result=%s\n" (string_of_value result)
+  )
 """
+
+    return (
+        template.replace("__NAME__", candidate["name"])
+        .replace("__SEMANTICS_COMMENT__", semantics["comment"])
+        .replace("__KEYWORD_RULE__", semantics["keyword_rule"])
+        .replace("__IF_RULE__", semantics["if_rule"])
+    )
 
 
 def _ast_schema(candidate: dict[str, Any]) -> dict[str, Any]:
