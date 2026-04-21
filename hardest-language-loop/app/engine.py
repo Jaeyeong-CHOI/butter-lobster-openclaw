@@ -22,6 +22,14 @@ OPENAI_MODEL_CATALOG = {
     "o4-mini": {"name": "o4-mini", "skill": 0.88, "prior_strength": 0.71},
 }
 
+THINKING_OPTIONS = ("off", "low", "medium", "high")
+THINKING_BONUS = {
+    "off": -0.04,
+    "low": 0.0,
+    "medium": 0.03,
+    "high": 0.06,
+}
+
 TASKS = [
     {"name": "abs", "entrenchment": 0.15},
     {"name": "max", "entrenchment": 0.20},
@@ -146,7 +154,12 @@ class AgentLoopService:
 
     def _generate_candidate(self, iteration: int, parent: dict[str, Any] | None) -> dict[str, Any]:
         settings = store.get_settings()
-        agent2_model = settings.get("agent2_model", "gpt-5.4")
+        agent_a_model = settings.get("agent_a_model", "gpt-5.4")
+        agent_a_temperature = float(settings.get("agent_a_temperature", 0.7))
+        agent_a_thinking = str(settings.get("agent_a_thinking", "high"))
+        agent_b_model = settings.get("agent_b_model", "gpt-5.4")
+        agent_b_temperature = float(settings.get("agent_b_temperature", 0.2))
+        agent_b_thinking = str(settings.get("agent_b_thinking", "medium"))
         rnd = random.Random(iteration * 7919)
         level, mutation_summary, interpreter_hint = MUTATIONS[iteration % len(MUTATIONS)]
         strategy_family = {
@@ -166,10 +179,20 @@ class AgentLoopService:
             "L5": "keyword_plus_syntax_plus_semantics",
         }.get(level, "inverted_if")
         parent_similarity = float(parent.get("similarity_score", 0.95)) if parent else 0.95
+        agent_a_thinking_bonus = THINKING_BONUS.get(agent_a_thinking, 0.03)
         similarity = max(0.45, min(0.98, parent_similarity + rnd.uniform(-0.08, 0.03)))
-        conflict = max(0.15, min(0.98, (parent.get("conflict_score", 0.2) if parent else 0.2) + rnd.uniform(0.03, 0.15)))
+        conflict = max(
+            0.15,
+            min(
+                0.98,
+                (parent.get("conflict_score", 0.2) if parent else 0.2)
+                + rnd.uniform(0.03, 0.15)
+                + agent_a_thinking_bonus * 0.4
+                + max(0.0, agent_a_temperature - 0.4) * 0.05,
+            ),
+        )
         solvable = max(0.35, min(0.97, 0.92 - abs(conflict - 0.72) * 0.7 + rnd.uniform(-0.08, 0.05)))
-        novelty = max(0.15, min(0.99, rnd.uniform(0.35, 0.9)))
+        novelty = max(0.15, min(0.99, rnd.uniform(0.35, 0.9) + agent_a_thinking_bonus * 0.5 + agent_a_temperature * 0.05))
         return {
             "id": f"cand-{uuid.uuid4().hex[:10]}",
             "parent_id": parent.get("id") if parent else None,
@@ -187,7 +210,22 @@ class AgentLoopService:
             "metadata": {
                 "prompt_mode_default": "interpreter_as_spec",
                 "agent1_parent": parent.get("name") if parent else "None",
-                "agent2_model": agent2_model,
+                "agent_a_model": agent_a_model,
+                "agent_a_temperature": agent_a_temperature,
+                "agent_a_thinking": agent_a_thinking,
+                "agent_b_model": agent_b_model,
+                "agent_b_temperature": agent_b_temperature,
+                "agent_b_thinking": agent_b_thinking,
+                "agent_a_settings": {
+                    "model": agent_a_model,
+                    "temperature": agent_a_temperature,
+                    "thinking": agent_a_thinking,
+                },
+                "agent_b_settings": {
+                    "model": agent_b_model,
+                    "temperature": agent_b_temperature,
+                    "thinking": agent_b_thinking,
+                },
                 "python_near": similarity > 0.72,
                 "task_bank": [t["name"] for t in TASKS],
                 "strategy_family": strategy_family,
@@ -198,7 +236,9 @@ class AgentLoopService:
 
     def _simulate_solver(self, candidate: dict[str, Any]) -> list[dict[str, Any]]:
         settings = store.get_settings()
-        model_name = settings.get("agent2_model", "gpt-5.4")
+        model_name = settings.get("agent_b_model", "gpt-5.4")
+        temperature = float(settings.get("agent_b_temperature", 0.2))
+        thinking = str(settings.get("agent_b_thinking", "medium"))
         model = OPENAI_MODEL_CATALOG.get(model_name, OPENAI_MODEL_CATALOG["gpt-5.4"])
         rnd = random.Random(candidate["id"])
         rows = []
@@ -206,10 +246,16 @@ class AgentLoopService:
             prior_penalty = task["entrenchment"] * candidate["conflict_score"] * model["prior_strength"]
             capability = model["skill"] * candidate["solvable_score"]
             prompt_bonus = 0.08 if candidate["level"] in {"L1", "L2", "L3"} else -0.05
-            raw = capability - prior_penalty + prompt_bonus + rnd.uniform(-0.08, 0.08)
+            thinking_bonus = THINKING_BONUS.get(thinking, 0.03)
+            stability_penalty = abs(temperature - 0.2) * 0.08
+            raw = capability - prior_penalty + prompt_bonus + thinking_bonus - stability_penalty + rnd.uniform(-0.08 - temperature * 0.04, 0.08 + temperature * 0.04)
             success = raw > 0.18
             score = max(0.0, min(1.0, 0.5 + raw))
             notes = "Fails on prior-entrenched task" if not success and task["entrenchment"] > 0.8 else ""
+            if notes:
+                notes += f" | thinking={thinking}, temperature={temperature}"
+            else:
+                notes = f"thinking={thinking}, temperature={temperature}"
             rows.append(
                 {
                     "id": f"eval-{uuid.uuid4().hex[:12]}",

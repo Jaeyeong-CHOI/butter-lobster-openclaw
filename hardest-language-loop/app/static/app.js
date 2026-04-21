@@ -4,6 +4,7 @@ const state = {
   lastEventId: 0,
   candidates: [],
   overview: null,
+  config: null,
   search: '',
   archivedOnly: false,
   selectedTreeNode: 'root',
@@ -23,11 +24,34 @@ const eventStatus = document.getElementById('eventStatus');
 const selectedHint = document.getElementById('selectedHint');
 const searchInput = document.getElementById('searchInput');
 const archivedOnlyInput = document.getElementById('archivedOnly');
-const agent2ModelSelect = document.getElementById('agent2ModelSelect');
-const openaiKeyInput = document.getElementById('openaiKeyInput');
-const saveKeyBtn = document.getElementById('saveKeyBtn');
-const clearKeyBtn = document.getElementById('clearKeyBtn');
 const configHint = document.getElementById('configHint');
+const settingsPreview = document.getElementById('settingsPreview');
+const openSettingsBtn = document.getElementById('openSettingsBtn');
+const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+const settingsModal = document.getElementById('settingsModal');
+const settingsBackdrop = document.getElementById('settingsBackdrop');
+
+const agentControls = {
+  agent_a: {
+    model: document.getElementById('agentAModelSelect'),
+    thinking: document.getElementById('agentAThinkingSelect'),
+    temperature: document.getElementById('agentATemperatureInput'),
+    apiKey: document.getElementById('agentAKeyInput'),
+    keyStatus: document.getElementById('agentAKeyStatus'),
+    clearKeyBtn: document.getElementById('agentAClearKeyBtn'),
+    label: 'Agent A',
+  },
+  agent_b: {
+    model: document.getElementById('agentBModelSelect'),
+    thinking: document.getElementById('agentBThinkingSelect'),
+    temperature: document.getElementById('agentBTemperatureInput'),
+    apiKey: document.getElementById('agentBKeyInput'),
+    keyStatus: document.getElementById('agentBKeyStatus'),
+    clearKeyBtn: document.getElementById('agentBClearKeyBtn'),
+    label: 'Agent B',
+  },
+};
 
 const artifactGlossary = {
   'spec.md': {
@@ -127,6 +151,22 @@ function percent(value, digits = 0) {
   return `${(Number(value || 0) * 100).toFixed(digits)}%`;
 }
 
+function thinkingLabel(value) {
+  const map = {
+    off: 'off',
+    low: 'low',
+    medium: 'medium',
+    high: 'high',
+  };
+  return map[value] || value || 'medium';
+}
+
+function keySourceLabel(status) {
+  if (!status?.configured) return '설정 안 됨';
+  if (status.source === 'legacy_shared') return `공통 키 상속 중 (${status.masked})`;
+  return `개별 키 설정됨 (${status.masked})`;
+}
+
 function pill(text, tone = '') {
   return `<span class="pill ${tone}">${escapeHtml(text)}</span>`;
 }
@@ -199,7 +239,6 @@ function artifactGuideCard(detail) {
     const entry = artifactGlossary[path] || {
       title: '보조 아티팩트',
       summary: '실행 과정에서 생성된 추가 산출물이다.',
-      why: '필요할 때 raw 내용을 직접 열어 세부 상태를 확인할 수 있다.',
     };
     return `
       <div class="artifact-row">
@@ -216,18 +255,86 @@ function getArtifact(detail, path) {
   return detail?.artifacts?.files?.[path] || '';
 }
 
-function updateConfigHint(settings, keyInfo) {
-  const modelName = settings?.agent2_model || 'gpt-5.4';
-  const keyText = keyInfo?.configured ? keyInfo.masked : '설정 안 됨';
-  configHint.textContent = `Agent2: ${modelName} · OpenAI key: ${keyText}`;
+function settingsPreviewText(agents) {
+  if (!agents) return 'A/B 설정 불러오는 중…';
+  const a = agents.agent_a;
+  const b = agents.agent_b;
+  return [
+    `A · ${a.model} · ${thinkingLabel(a.thinking)} · temp ${a.temperature}`,
+    `B · ${b.model} · ${thinkingLabel(b.thinking)} · temp ${b.temperature}`,
+  ].join('  |  ');
+}
+
+function configHintText(agents) {
+  if (!agents) return '설정 불러오는 중…';
+  return `A: ${agents.agent_a.model} / ${thinkingLabel(agents.agent_a.thinking)} / ${agents.agent_a.temperature} · B: ${agents.agent_b.model} / ${thinkingLabel(agents.agent_b.thinking)} / ${agents.agent_b.temperature}`;
+}
+
+function populateConfigControls(config) {
+  if (!config) return;
+  const models = config.openai_models || [];
+  const thinkingOptions = config.thinking_options || [];
+
+  Object.entries(agentControls).forEach(([agentKey, controls]) => {
+    const agent = config.agents?.[agentKey];
+    if (!agent) return;
+    controls.model.innerHTML = models.map((name) => `<option value="${name}">${name}</option>`).join('');
+    controls.model.value = agent.model;
+    controls.thinking.innerHTML = thinkingOptions.map((value) => `<option value="${value}">${thinkingLabel(value)}</option>`).join('');
+    controls.thinking.value = agent.thinking;
+    controls.temperature.value = agent.temperature;
+    controls.apiKey.value = '';
+    controls.keyStatus.textContent = keySourceLabel(agent.api_key);
+  });
+
+  settingsPreview.textContent = settingsPreviewText(config.agents);
+  configHint.textContent = configHintText(config.agents);
+}
+
+function normalizeAgentSettingsFromCandidate(meta = {}) {
+  return {
+    agent_a: meta.agent_a_settings || {
+      model: meta.agent_a_model || 'gpt-5.4',
+      thinking: meta.agent_a_thinking || 'high',
+      temperature: meta.agent_a_temperature ?? 0.7,
+    },
+    agent_b: meta.agent_b_settings || {
+      model: meta.agent_b_model || 'gpt-5.4',
+      thinking: meta.agent_b_thinking || 'medium',
+      temperature: meta.agent_b_temperature ?? 0.2,
+    },
+  };
 }
 
 async function loadConfig() {
   const data = await getJson('/api/config');
-  const current = data.settings?.agent2_model || 'gpt-5.4';
-  agent2ModelSelect.innerHTML = data.openai_models.map((name) => `<option value="${name}">${name}</option>`).join('');
-  agent2ModelSelect.value = current;
-  updateConfigHint(data.settings, data.openai_api_key);
+  state.config = data;
+  populateConfigControls(data);
+}
+
+function openSettingsModal() {
+  settingsModal.classList.remove('hidden');
+  settingsModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeSettingsModal() {
+  settingsModal.classList.add('hidden');
+  settingsModal.setAttribute('aria-hidden', 'true');
+}
+
+function buildAgentsPayload() {
+  const agents = {};
+  Object.entries(agentControls).forEach(([agentKey, controls]) => {
+    const payload = {
+      model: controls.model.value,
+      thinking: controls.thinking.value,
+      temperature: Number(controls.temperature.value),
+    };
+    const keyValue = controls.apiKey.value.trim();
+    if (keyValue) payload.api_key = keyValue;
+    agents[agentKey] = payload;
+  });
+  return { agents };
 }
 
 async function updateConfig(payload) {
@@ -236,8 +343,8 @@ async function updateConfig(payload) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  updateConfigHint(data.settings, data.openai_api_key);
-  openaiKeyInput.value = '';
+  state.config = data;
+  populateConfigControls(data);
   await refreshOverview();
   await refreshCandidates({ autoSelect: false });
   if (state.selectedId) {
@@ -245,20 +352,27 @@ async function updateConfig(payload) {
   }
 }
 
+async function clearAgentKey(agentKey) {
+  await updateConfig({ agents: { [agentKey]: { clear_api_key: true } } });
+}
+
 async function refreshOverview() {
   const data = await getJson('/api/overview');
   state.overview = data;
   const loopState = data.state || {};
   const hardest = data.hardest || {};
-  const settings = data.settings || {};
+  const agents = state.config?.agents || data.agents || null;
+
   summaryBar.innerHTML = [
     metricCard('루프 상태', (loopState.status || 'idle').toUpperCase(), loopState.note || '실행 대기 중'),
     metricCard('Iteration', loopState.iteration ?? 0, '완료된 라운드 수'),
     metricCard('후보 수', data.stats.total_candidates, '생성된 candidate'),
     metricCard('Archive', data.stats.archived_candidates, 'hard-but-valid'),
-    metricCard('Agent 2 모델', settings.agent2_model || 'gpt-5.4', '현재 solver'),
+    metricCard('Agent A', agents?.agent_a?.model || '—', `${thinkingLabel(agents?.agent_a?.thinking)} · temp ${agents?.agent_a?.temperature ?? '—'}`),
+    metricCard('Agent B', agents?.agent_b?.model || '—', `${thinkingLabel(agents?.agent_b?.thinking)} · temp ${agents?.agent_b?.temperature ?? '—'}`),
     metricCard('현재 hardest', hardest.name || '—', hardest.failure_rate != null ? `failure ${percent(hardest.failure_rate)}` : '아직 없음'),
   ].join('');
+
   renderBenchmark();
 }
 
@@ -305,6 +419,7 @@ function renderFocusCard() {
   }
 
   const meta = detail.metadata || {};
+  const agentSettings = normalizeAgentSettingsFromCandidate(meta);
   focusCard.innerHTML = `
     <div class="focus-hero">
       <div>
@@ -321,11 +436,17 @@ function renderFocusCard() {
     </div>
     <div class="focus-grid">
       ${kv('Parent', meta.agent1_parent || detail.parent_id || 'None')}
-      ${kv('Agent 2 모델', meta.agent2_model || 'gpt-5.4')}
       ${kv('Similarity', detail.similarity_score ?? '—')}
       ${kv('Conflict', detail.conflict_score ?? '—')}
       ${kv('Solvable', detail.solvable_score ?? '—')}
       ${kv('Novelty', detail.novelty_score ?? '—')}
+      ${kv('Task bank', Array.isArray(meta.task_bank) ? meta.task_bank.join(', ') : '—')}
+      ${kv('Agent A 모델', agentSettings.agent_a.model)}
+      ${kv('Agent A thinking', thinkingLabel(agentSettings.agent_a.thinking))}
+      ${kv('Agent A temp', agentSettings.agent_a.temperature)}
+      ${kv('Agent B 모델', agentSettings.agent_b.model)}
+      ${kv('Agent B thinking', thinkingLabel(agentSettings.agent_b.thinking))}
+      ${kv('Agent B temp', agentSettings.agent_b.temperature)}
     </div>
   `;
 }
@@ -342,6 +463,8 @@ function filteredCandidates() {
       candidate.mutation_summary,
       meta.strategy_family || '',
       meta.strategy_leaf || '',
+      meta.agent_a_model || '',
+      meta.agent_b_model || '',
       candidate.status || '',
     ].join(' ').toLowerCase();
     return hay.includes(q);
@@ -361,7 +484,8 @@ function candidateRow(candidate) {
       <div class="pills">
         ${pill(`failure ${percent(candidate.failure_rate)}`)}
         ${pill(meta.strategy_leaf || 'strategy n/a')}
-        ${pill(candidate.archived ? 'archived' : (candidate.status || 'generated'))}
+        ${pill(`A ${meta.agent_a_model || '—'}`)}
+        ${pill(`B ${meta.agent_b_model || '—'}`)}
       </div>
     </div>
   `;
@@ -386,9 +510,7 @@ async function refreshCandidates({ autoSelect = true } = {}) {
 
   if (state.selectedId) {
     const stillExists = state.candidates.some((item) => item.id === state.selectedId);
-    if (!stillExists) {
-      clearSelection();
-    }
+    if (!stillExists) clearSelection();
   }
 
   const items = filteredCandidates();
@@ -406,7 +528,7 @@ function clearSelection() {
   selectedHint.textContent = '후보를 선택해줘';
   renderFocusCard();
   strategyTreeStage.innerHTML = panelEmpty('전략 트리가 비어 있음', '후보를 선택하면 어떤 전략 family와 leaf에서 나왔는지 여기에 표시된다.');
-  graphStage.innerHTML = panelEmpty('실행 그래프가 비어 있음', '후보를 선택하면 Agent A → Agent B → Validator 흐름이 여기 나타난다.');
+  graphStage.innerHTML = panelEmpty('실행 그래프가 비어 있음', '후보를 선택하면 Agent A → Agent B → Validator 흐름이 여기에 나타난다.');
   inspectorContent.className = 'inspector empty';
   inspectorContent.innerHTML = emptyInspectorHtml();
 }
@@ -537,6 +659,7 @@ function renderAgentGraph(graph) {
 
 function showCandidateInspector(detail) {
   const meta = detail.metadata || {};
+  const agentSettings = normalizeAgentSettingsFromCandidate(meta);
   inspectorContent.classList.remove('empty');
   inspectorContent.innerHTML = `
     <div class="inspector-section">
@@ -548,12 +671,14 @@ function showCandidateInspector(detail) {
           ${pill(detail.archived ? 'archived' : (detail.status || 'generated'), detail.archived ? 'tone-green' : '')}
         </div>
       `)}
-      ${inspectorCard('파이프라인 한눈에 보기', `
+      ${inspectorCard('에이전트 설정', `
         <div class="inspector-grid">
-          ${kv('Agent A', '인터프리터 생성 / 변이')}
-          ${kv('Agent B', 'JSON AST 프로그램 제출')}
-          ${kv('Validator', 'JSON → AST → 실행')}
-          ${kv('Format', '기계 검증 가능한 산출물')}
+          ${kv('Agent A 모델', agentSettings.agent_a.model)}
+          ${kv('Agent A thinking', thinkingLabel(agentSettings.agent_a.thinking))}
+          ${kv('Agent A temp', agentSettings.agent_a.temperature)}
+          ${kv('Agent B 모델', agentSettings.agent_b.model)}
+          ${kv('Agent B thinking', thinkingLabel(agentSettings.agent_b.thinking))}
+          ${kv('Agent B temp', agentSettings.agent_b.temperature)}
         </div>
       `)}
       ${inspectorCard('핵심 파일 두 개', `
@@ -639,35 +764,20 @@ async function selectCandidate(id, { updateInspector = true } = {}) {
   renderCandidateList();
   renderStrategyTree(tree);
   renderAgentGraph(graph);
-
-  if (updateInspector) {
-    showCandidateInspector(detail);
-  }
+  if (updateInspector) showCandidateInspector(detail);
 }
 
 function eventSummary(event) {
   const payload = event.payload || {};
   switch (event.kind) {
     case 'bootstrap':
-      return {
-        title: '초기화 완료',
-        summary: payload.note || payload.message || '빈 상태 부트스트랩이 완료됨',
-      };
+      return { title: '초기화 완료', summary: payload.note || payload.message || '빈 상태 부트스트랩 완료' };
     case 'loop_started':
-      return {
-        title: '루프 시작',
-        summary: payload.message || 'Agent loop가 시작됨',
-      };
+      return { title: '루프 시작', summary: payload.message || 'Agent loop 시작' };
     case 'loop_paused':
-      return {
-        title: '루프 일시정지',
-        summary: payload.message || 'Agent loop가 멈춤',
-      };
+      return { title: '루프 일시정지', summary: payload.message || 'Agent loop 정지' };
     case 'loop_reset':
-      return {
-        title: '루프 리셋',
-        summary: payload.message || '상태와 후보가 모두 초기화됨',
-      };
+      return { title: '루프 리셋', summary: payload.message || '상태와 후보가 초기화됨' };
     case 'candidate_generated':
       return {
         title: `${payload.name || payload.candidate_id || 'candidate'} 생성`,
@@ -679,20 +789,14 @@ function eventSummary(event) {
         summary: `${payload.candidate_id || ''} · failure ${percent(payload.failure_rate)}${payload.archived ? ' · archive 진입' : ''}`,
       };
     case 'archive_updated':
-      return {
-        title: 'Archive 업데이트',
-        summary: payload.message || '새 hardest candidate가 archive에 추가됨',
-      };
-    case 'config_updated':
-      return {
-        title: '설정 변경',
-        summary: payload.message || '설정이 갱신됨',
-      };
+      return { title: 'Archive 업데이트', summary: payload.message || '새 hardest candidate가 archive에 추가됨' };
+    case 'config_updated': {
+      const changes = payload.changes || {};
+      const parts = Object.entries(changes).map(([agent, keys]) => `${agent}: ${(keys || []).join(', ')}`);
+      return { title: '설정 변경', summary: parts.length ? parts.join(' · ') : (payload.message || '설정이 갱신됨') };
+    }
     default:
-      return {
-        title: event.kind,
-        summary: payload.message || '세부 payload를 열어 확인할 수 있음',
-      };
+      return { title: event.kind, summary: payload.message || '세부 payload를 열어 확인할 수 있음' };
   }
 }
 
@@ -749,19 +853,24 @@ archivedOnlyInput.addEventListener('change', (e) => {
   renderCandidateList();
 });
 
-agent2ModelSelect.addEventListener('change', async (e) => {
-  await updateConfig({ agent2_model: e.target.value });
+openSettingsBtn.addEventListener('click', openSettingsModal);
+closeSettingsBtn.addEventListener('click', closeSettingsModal);
+settingsBackdrop.addEventListener('click', closeSettingsModal);
+saveSettingsBtn.addEventListener('click', async () => {
+  await updateConfig(buildAgentsPayload());
+  closeSettingsModal();
 });
 
-saveKeyBtn.addEventListener('click', async () => {
-  const value = openaiKeyInput.value.trim();
-  if (!value) return;
-  await updateConfig({ openai_api_key: value });
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !settingsModal.classList.contains('hidden')) {
+    closeSettingsModal();
+  }
 });
 
-clearKeyBtn.addEventListener('click', async () => {
-  openaiKeyInput.value = '';
-  await updateConfig({ clear_openai_api_key: true });
+Object.entries(agentControls).forEach(([agentKey, controls]) => {
+  controls.clearKeyBtn.addEventListener('click', async () => {
+    await clearAgentKey(agentKey);
+  });
 });
 
 document.getElementById('startBtn').addEventListener('click', () => post('/api/loop/start'));
@@ -775,12 +884,8 @@ document.getElementById('resetBtn').addEventListener('click', async () => {
 
 function connectEvents() {
   const source = new EventSource('/api/events/stream');
-  source.onopen = () => {
-    eventStatus.textContent = 'live';
-  };
-  source.onerror = () => {
-    eventStatus.textContent = 'reconnecting…';
-  };
+  source.onopen = () => { eventStatus.textContent = 'live'; };
+  source.onerror = () => { eventStatus.textContent = 'reconnecting…'; };
   source.onmessage = async (msg) => {
     const event = JSON.parse(msg.data);
     if (event.id <= state.lastEventId) return;

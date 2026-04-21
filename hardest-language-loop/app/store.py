@@ -11,10 +11,28 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "loop.db"
 SECRETS_PATH = BASE_DIR / "data" / "secrets.json"
 CANDIDATE_ROOT = BASE_DIR / "data" / "candidates"
+AGENT_KEYS = ("agent_a", "agent_b")
 
 DEFAULT_SETTINGS = {
-    "agent2_model": "gpt-5.4",
+    "agent_a_model": "gpt-5.4",
+    "agent_a_temperature": 0.7,
+    "agent_a_thinking": "high",
+    "agent_b_model": "gpt-5.4",
+    "agent_b_temperature": 0.2,
+    "agent_b_thinking": "medium",
 }
+
+
+def _mask_api_key(key: str) -> str:
+    if len(key) <= 10:
+        return "*" * len(key)
+    return f"{key[:7]}...{key[-4:]}"
+
+
+def _agent_secret_key(agent: str) -> str:
+    if agent not in AGENT_KEYS:
+        raise ValueError(f"Unknown agent: {agent}")
+    return f"{agent}_api_key"
 
 
 def _read_secrets() -> dict[str, Any]:
@@ -56,11 +74,39 @@ def get_openai_api_key_status() -> dict[str, Any]:
     key = get_openai_api_key()
     if not key:
         return {"configured": False, "masked": None}
-    if len(key) <= 10:
-        masked = "*" * len(key)
-    else:
-        masked = f"{key[:7]}...{key[-4:]}"
-    return {"configured": True, "masked": masked}
+    return {"configured": True, "masked": _mask_api_key(key)}
+
+
+def set_agent_api_key(agent: str, api_key: str) -> None:
+    secrets = _read_secrets()
+    secrets[_agent_secret_key(agent)] = api_key
+    _write_secrets(secrets)
+
+
+def clear_agent_api_key(agent: str) -> None:
+    secrets = _read_secrets()
+    secrets.pop(_agent_secret_key(agent), None)
+    _write_secrets(secrets)
+
+
+def get_agent_api_key(agent: str) -> str | None:
+    secrets = _read_secrets()
+    specific = secrets.get(_agent_secret_key(agent))
+    if isinstance(specific, str) and specific:
+        return specific
+    legacy = secrets.get("openai_api_key")
+    return legacy if isinstance(legacy, str) and legacy else None
+
+
+def get_agent_api_key_status(agent: str) -> dict[str, Any]:
+    secrets = _read_secrets()
+    specific = secrets.get(_agent_secret_key(agent))
+    if isinstance(specific, str) and specific:
+        return {"configured": True, "masked": _mask_api_key(specific), "source": "agent"}
+    legacy = secrets.get("openai_api_key")
+    if isinstance(legacy, str) and legacy:
+        return {"configured": True, "masked": _mask_api_key(legacy), "source": "legacy_shared"}
+    return {"configured": False, "masked": None, "source": None}
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:

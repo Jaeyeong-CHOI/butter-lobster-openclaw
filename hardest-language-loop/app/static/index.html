@@ -16,19 +16,12 @@
         <p class="subtitle">인터프리터 기반 언어 탐색, Solver 실행, Validator 판정을 하나의 그래프 중심 화면에서 읽는 연구용 모니터.</p>
       </div>
       <div class="header-controls">
-        <label class="control-block">
-          <span>Agent 2 모델</span>
-          <select id="agent2ModelSelect"></select>
-        </label>
-        <label class="control-block key-block">
-          <span>OpenAI API Key</span>
-          <div class="key-row">
-            <input id="openaiKeyInput" type="password" placeholder="sk-..." />
-            <button id="saveKeyBtn" class="secondary">저장</button>
-            <button id="clearKeyBtn" class="secondary">삭제</button>
-          </div>
-        </label>
+        <div class="settings-summary">
+          <div class="settings-kicker">에이전트 설정</div>
+          <div id="settingsPreview" class="settings-preview">A/B 설정 불러오는 중…</div>
+        </div>
         <div class="run-controls">
+          <button id="openSettingsBtn" class="secondary">설정</button>
           <button id="startBtn">시작</button>
           <button id="pauseBtn" class="secondary">일시정지</button>
           <button id="stepBtn" class="secondary">1 step</button>
@@ -109,8 +102,8 @@
           <div id="inspectorContent" class="inspector empty">
             <div class="empty-state">
               <div class="empty-icon">◎</div>
-              <div class="empty-title">Select a candidate, node, or edge</div>
-              <div class="empty-copy">The inspector will show prompts, JSON contracts, task definitions, and validator artifacts.</div>
+              <div class="empty-title">후보, 노드, 또는 엣지를 선택해줘</div>
+              <div class="empty-copy">인스펙터에는 프롬프트, JSON 계약, 태스크 정의, 검증 결과 아티팩트가 표시된다.</div>
             </div>
           </div>
         </section>
@@ -124,6 +117,85 @@
         </section>
       </aside>
     </main>
+
+    <div id="settingsModal" class="settings-modal-shell hidden" aria-hidden="true">
+      <div id="settingsBackdrop" class="settings-backdrop"></div>
+      <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <div class="settings-modal-head">
+          <div>
+            <div class="eyebrow">Agent configuration</div>
+            <h2 id="settingsTitle">에이전트 설정</h2>
+            <p class="settings-modal-copy">Agent A / B 각각에 대해 모델, API key, thinking, temperature를 따로 설정할 수 있다.</p>
+          </div>
+          <button id="closeSettingsBtn" class="secondary">닫기</button>
+        </div>
+
+        <div class="settings-agent-grid">
+          <section class="settings-agent-card">
+            <div class="settings-agent-head">
+              <h3>Agent A</h3>
+              <span class="muted">Interpreter Builder / Mutator</span>
+            </div>
+            <div class="settings-form-grid">
+              <label class="control-block">
+                <span>모델</span>
+                <select id="agentAModelSelect"></select>
+              </label>
+              <label class="control-block">
+                <span>Thinking</span>
+                <select id="agentAThinkingSelect"></select>
+              </label>
+              <label class="control-block">
+                <span>Temperature</span>
+                <input id="agentATemperatureInput" type="number" min="0" max="2" step="0.1" />
+              </label>
+              <label class="control-block key-block settings-key-block">
+                <span>API Key</span>
+                <input id="agentAKeyInput" type="password" placeholder="sk-..." />
+                <div class="settings-key-meta">
+                  <span id="agentAKeyStatus" class="muted">상태 불러오는 중…</span>
+                  <button id="agentAClearKeyBtn" class="secondary small">키 삭제</button>
+                </div>
+              </label>
+            </div>
+          </section>
+
+          <section class="settings-agent-card">
+            <div class="settings-agent-head">
+              <h3>Agent B</h3>
+              <span class="muted">Program Generator / Solver</span>
+            </div>
+            <div class="settings-form-grid">
+              <label class="control-block">
+                <span>모델</span>
+                <select id="agentBModelSelect"></select>
+              </label>
+              <label class="control-block">
+                <span>Thinking</span>
+                <select id="agentBThinkingSelect"></select>
+              </label>
+              <label class="control-block">
+                <span>Temperature</span>
+                <input id="agentBTemperatureInput" type="number" min="0" max="2" step="0.1" />
+              </label>
+              <label class="control-block key-block settings-key-block">
+                <span>API Key</span>
+                <input id="agentBKeyInput" type="password" placeholder="sk-..." />
+                <div class="settings-key-meta">
+                  <span id="agentBKeyStatus" class="muted">상태 불러오는 중…</span>
+                  <button id="agentBClearKeyBtn" class="secondary small">키 삭제</button>
+                </div>
+              </label>
+            </div>
+          </section>
+        </div>
+
+        <div class="settings-modal-actions">
+          <div class="settings-help">빈 API key 입력칸은 그대로 두면 기존 키를 유지하고, 삭제 버튼은 해당 agent의 개별 키를 지운다.</div>
+          <button id="saveSettingsBtn">설정 저장</button>
+        </div>
+      </section>
+    </div>
 
     <script src="/static/app.js"></script>
   </body>

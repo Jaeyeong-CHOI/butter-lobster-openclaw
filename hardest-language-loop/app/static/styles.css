@@ -123,6 +123,29 @@ body > * { position: relative; z-index: 1; }
   align-items: flex-end;
 }
 
+.settings-summary {
+  min-width: 320px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow);
+}
+.settings-kicker {
+  color: var(--muted-2);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.settings-preview {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 700;
+}
+
 .control-block {
   display: flex;
   flex-direction: column;
@@ -180,10 +203,14 @@ button.danger {
   background: linear-gradient(180deg, #ff8f85 0%, #ff655d 100%);
   box-shadow: 0 10px 18px rgba(220, 38, 38, 0.14);
 }
+button.small {
+  padding: 8px 10px;
+  font-size: 12px;
+}
 
 .summary-bar {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
   padding: 16px 22px 0;
 }
@@ -823,8 +850,101 @@ button.danger {
   line-height: 1.55;
 }
 
+.settings-modal-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+.settings-modal-shell.hidden {
+  display: none;
+}
+.settings-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.36);
+  backdrop-filter: blur(8px);
+}
+.settings-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(1120px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 20px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 28px 64px rgba(15, 23, 42, 0.22);
+}
+.settings-modal-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+.settings-modal-head h2 {
+  margin: 10px 0 0;
+  font-size: 28px;
+  letter-spacing: -0.04em;
+}
+.settings-modal-copy {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.settings-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.settings-agent-card {
+  padding: 16px;
+  border-radius: 22px;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow);
+}
+.settings-agent-head {
+  margin-bottom: 14px;
+}
+.settings-agent-head h3 {
+  margin: 0 0 4px;
+  font-size: 18px;
+  letter-spacing: -0.03em;
+}
+.settings-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.settings-key-block {
+  grid-column: 1 / -1;
+  min-width: 100%;
+}
+.settings-key-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-top: 8px;
+}
+.settings-modal-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-top: 18px;
+}
+.settings-help {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 @media (max-width: 1600px) {
-  .summary-bar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .focus-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 1480px) {
@@ -839,6 +959,8 @@ button.danger {
   .focus-grid,
   .benchmark-grid,
   .inspector-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .settings-agent-grid,
+  .settings-form-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 820px) {
   .topbar {
@@ -847,6 +969,7 @@ button.danger {
   }
   .brand h1 { font-size: 26px; }
   .header-controls { width: 100%; }
+  .settings-summary { min-width: 100%; }
   .key-block { min-width: 100%; }
   .key-row,
   .run-controls { flex-wrap: wrap; }
@@ -856,4 +979,12 @@ button.danger {
   .inspector-grid { grid-template-columns: 1fr; }
   .focus-hero { flex-direction: column; }
   .focus-pills { justify-content: flex-start; max-width: none; }
+  .settings-modal {
+    width: calc(100vw - 20px);
+    max-height: calc(100vh - 20px);
+    padding: 16px;
+  }
+  .settings-modal-head,
+  .settings-modal-actions,
+  .settings-key-meta { flex-direction: column; align-items: flex-start; }
 }

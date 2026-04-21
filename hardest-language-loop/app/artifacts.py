@@ -204,12 +204,27 @@ def _agent_graph(candidate: dict[str, Any]) -> dict[str, Any]:
 def _language_spec(candidate: dict[str, Any], parent_name: str | None) -> dict[str, Any]:
     meta = candidate.get("metadata", {}) or {}
     level = candidate.get("level", "L3")
+    agent_a_settings = meta.get(
+        "agent_a_settings",
+        {
+            "model": meta.get("agent_a_model", "gpt-5.4"),
+            "temperature": meta.get("agent_a_temperature", 0.7),
+            "thinking": meta.get("agent_a_thinking", "high"),
+        },
+    )
+    agent_b_settings = meta.get(
+        "agent_b_settings",
+        {
+            "model": meta.get("agent_b_model", "gpt-5.4"),
+            "temperature": meta.get("agent_b_temperature", 0.2),
+            "thinking": meta.get("agent_b_thinking", "medium"),
+        },
+    )
     semantics = {
         "control_flow": "inverted_if" if level in {"L3", "L4", "L5"} else "canonical_if",
         "syntax_mode": "python_near" if candidate.get("similarity_score", 0.0) >= 0.7 else "restructured",
         "submission_format": "json_ast_v1",
         "execution_mode": "interpreter_ml",
-        "agent2_model": meta.get("agent2_model", "gpt-5.4"),
     }
     return {
         "candidate_id": candidate["id"],
@@ -230,6 +245,10 @@ def _language_spec(candidate: dict[str, Any], parent_name: str | None) -> dict[s
             "agent_a": "Interpreter Builder / Mutator",
             "agent_b": "Program Generator / Solver",
             "validator": "Deterministic JSON->AST->Interpreter execution",
+        },
+        "agent_settings": {
+            "agent_a": agent_a_settings,
+            "agent_b": agent_b_settings,
         },
         "status": candidate.get("status", "generated"),
         "archived": bool(candidate.get("archived")),
@@ -381,9 +400,29 @@ def _validator_result(candidate: dict[str, Any], evaluations: list[dict[str, Any
 
 
 def _agent_prompts(candidate: dict[str, Any], parent_name: str | None) -> dict[str, str]:
-    agent2_model = (candidate.get("metadata", {}) or {}).get("agent2_model", "gpt-5.4")
+    meta = candidate.get("metadata", {}) or {}
+    agent_a = meta.get(
+        "agent_a_settings",
+        {
+            "model": meta.get("agent_a_model", "gpt-5.4"),
+            "temperature": meta.get("agent_a_temperature", 0.7),
+            "thinking": meta.get("agent_a_thinking", "high"),
+        },
+    )
+    agent_b = meta.get(
+        "agent_b_settings",
+        {
+            "model": meta.get("agent_b_model", "gpt-5.4"),
+            "temperature": meta.get("agent_b_temperature", 0.2),
+            "thinking": meta.get("agent_b_thinking", "medium"),
+        },
+    )
     return {
         "prompts/agentA_interpreter_builder.txt": f"""You are Agent A (Interpreter Builder / Mutator).
+
+Selected OpenAI model: {agent_a.get('model', 'gpt-5.4')}
+Thinking: {agent_a.get('thinking', 'high')}
+Temperature: {agent_a.get('temperature', 0.7)}
 
 Parent language: {parent_name or 'None'}
 Target candidate: {candidate['name']} ({candidate['level']})
@@ -402,7 +441,9 @@ Interpreter hint:
 """,
         "prompts/agentB_solver.txt": f"""You are Agent B (Program Generator / Solver).
 
-Selected OpenAI model: {agent2_model}
+Selected OpenAI model: {agent_b.get('model', 'gpt-5.4')}
+Thinking: {agent_b.get('thinking', 'medium')}
+Temperature: {agent_b.get('temperature', 0.2)}
 
 Input artifacts:
 - interpreter.ml
