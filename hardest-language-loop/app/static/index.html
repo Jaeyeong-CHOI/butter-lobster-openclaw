@@ -13,26 +13,26 @@
       <div class="brand">
         <div class="eyebrow">Executable pipeline monitor</div>
         <h1>Hardest Language Loop</h1>
-        <p class="subtitle">Graph-first interface for strategy search, agent coordination, and executable validation.</p>
+        <p class="subtitle">인터프리터 기반 언어 탐색, Solver 실행, Validator 판정을 하나의 그래프 중심 화면에서 읽는 연구용 모니터.</p>
       </div>
       <div class="header-controls">
         <label class="control-block">
-          <span>Agent 2 Model</span>
+          <span>Agent 2 모델</span>
           <select id="agent2ModelSelect"></select>
         </label>
         <label class="control-block key-block">
           <span>OpenAI API Key</span>
           <div class="key-row">
             <input id="openaiKeyInput" type="password" placeholder="sk-..." />
-            <button id="saveKeyBtn" class="secondary">Save</button>
-            <button id="clearKeyBtn" class="secondary">Clear</button>
+            <button id="saveKeyBtn" class="secondary">저장</button>
+            <button id="clearKeyBtn" class="secondary">삭제</button>
           </div>
         </label>
         <div class="run-controls">
-          <button id="startBtn">Start</button>
-          <button id="pauseBtn" class="secondary">Pause</button>
-          <button id="stepBtn" class="secondary">Step</button>
-          <button id="resetBtn" class="danger">Reset</button>
+          <button id="startBtn">시작</button>
+          <button id="pauseBtn" class="secondary">일시정지</button>
+          <button id="stepBtn" class="secondary">1 step</button>
+          <button id="resetBtn" class="danger">리셋</button>
         </div>
       </div>
     </header>
@@ -43,50 +43,58 @@
       <aside class="sidebar left">
         <section class="panel">
           <div class="panel-head">
-            <h2>Candidates</h2>
+            <h2>후보 언어</h2>
             <span id="configHint" class="muted">loading…</span>
           </div>
           <div class="filters">
-            <input id="searchInput" class="search" placeholder="Search by level, strategy, mutation…" />
-            <label class="checkbox"><input type="checkbox" id="archivedOnly" /> archived only</label>
+            <input id="searchInput" class="search" placeholder="level, strategy, mutation으로 검색…" />
+            <label class="checkbox"><input type="checkbox" id="archivedOnly" /> archive만 보기</label>
           </div>
           <div id="candidateList" class="candidate-list"></div>
         </section>
       </aside>
 
       <section class="center-stage">
+        <section class="panel focus-panel">
+          <div class="panel-head">
+            <h2>현재 포커스</h2>
+            <span class="muted">지금 선택한 candidate의 핵심 상태</span>
+          </div>
+          <div id="focusCard" class="focus-card"></div>
+        </section>
+
         <section class="panel graph-panel">
           <div class="panel-head">
-            <h2>Strategy Tree</h2>
-            <span class="muted">click a node to filter candidates</span>
+            <h2>전략 트리</h2>
+            <span class="muted">노드를 누르면 해당 전략으로 후보가 필터링됨</span>
           </div>
           <div class="legend-row">
             <span class="legend-pill legend-root">root</span>
             <span class="legend-pill legend-family">family</span>
             <span class="legend-pill legend-strategy">strategy</span>
-            <span class="legend-note">selected branch = active search direction</span>
+            <span class="legend-note">선택된 branch가 현재 탐색 방향</span>
           </div>
           <div id="strategyTreeStage" class="tree-stage"></div>
         </section>
 
         <section class="panel graph-panel large">
           <div class="panel-head">
-            <h2>Agent Exchange Graph</h2>
-            <span class="muted">click nodes for prompts/files · click edges for exchanged information</span>
+            <h2>실행 그래프</h2>
+            <span class="muted">노드는 역할/파일, 엣지는 실제 정보 흐름</span>
           </div>
           <div class="legend-row">
             <span class="legend-pill legend-agent">agent</span>
             <span class="legend-pill legend-artifact">artifact</span>
             <span class="legend-pill legend-strategy">strategy</span>
-            <span class="legend-note">edges represent actual information flow</span>
+            <span class="legend-note">엣지는 실제 정보 교환을 뜻함</span>
           </div>
           <div id="graphStage" class="graph-stage"></div>
         </section>
 
         <section class="panel graph-panel benchmark-panel">
           <div class="panel-head">
-            <h2>Benchmark Snapshot</h2>
-            <span class="muted">live execution summary</span>
+            <h2>벤치마크 스냅샷</h2>
+            <span class="muted">현재 실행 결과 요약</span>
           </div>
           <div id="benchmarkContent" class="benchmark-grid"></div>
         </section>
@@ -95,8 +103,8 @@
       <aside class="sidebar right">
         <section class="panel inspector-panel">
           <div class="panel-head">
-            <h2>Inspector</h2>
-            <span id="selectedHint" class="muted">Select a candidate</span>
+            <h2>인스펙터</h2>
+            <span id="selectedHint" class="muted">후보를 선택해줘</span>
           </div>
           <div id="inspectorContent" class="inspector empty">
             <div class="empty-state">
@@ -109,7 +117,7 @@
 
         <section class="panel event-panel">
           <div class="panel-head">
-            <h2>Event Stream</h2>
+            <h2>이벤트 스트림</h2>
             <span id="eventStatus" class="badge">connecting…</span>
           </div>
           <div id="eventList" class="event-list"></div>

@@ -15,6 +15,7 @@ const summaryBar = document.getElementById('summaryBar');
 const candidateList = document.getElementById('candidateList');
 const strategyTreeStage = document.getElementById('strategyTreeStage');
 const graphStage = document.getElementById('graphStage');
+const focusCard = document.getElementById('focusCard');
 const inspectorContent = document.getElementById('inspectorContent');
 const benchmarkContent = document.getElementById('benchmarkContent');
 const eventList = document.getElementById('eventList');
@@ -31,73 +32,73 @@ const configHint = document.getElementById('configHint');
 const artifactGlossary = {
   'spec.md': {
     title: '후보 언어 개요 문서',
-    summary: '이 후보 언어의 핵심 정보를 사람이 읽기 쉬운 마크다운 문서로 정리한 파일이다.',
-    why: '후보의 수준, 부모 후보, 변이 요약, 파이프라인 구조를 빠르게 훑어볼 때 가장 먼저 보는 요약본이다.',
-  },
-  'ast_schema.json': {
-    title: 'AST 스키마 계약',
-    summary: 'Agent B가 어떤 JSON 구조로 프로그램을 제출해야 하는지 정의한 계약서다. 노드 종류, 필드 이름, 중첩 규칙이 여기에 들어간다.',
-    why: '이 파일이 없으면 Solver가 제멋대로 JSON을 만들 수 있고, Validator는 그것을 언어 AST로 안정적으로 복원할 수 없다.',
-  },
-  'tasks.json': {
-    title: '벤치마크 태스크 묶음',
-    summary: '후보 언어마다 풀어야 할 문제 목록을 담은 파일이다. 프롬프트, 카테고리, 기대 동작이 함께 들어간다.',
-    why: 'Agent B는 이 파일을 보고 무엇을 풀어야 하는지 결정하고, Validator는 실제 실행 결과가 기대 동작과 맞는지 비교한다.',
+    summary: '이 후보 언어의 핵심 내용을 사람이 읽기 쉬운 마크다운 문서로 정리한 파일이다.',
+    why: '후보의 수준, 부모, 변이 요약, 파이프라인 구조를 가장 빠르게 훑어볼 수 있는 입구다.',
   },
   'interpreter.ml': {
     title: '실행 가능한 언어 정의',
     summary: '후보 언어의 의미론을 실제로 실행 가능한 OCaml 인터프리터로 담아둔 파일이다.',
-    why: '모호한 자연어 설명 대신, 이 파일이 언어의 최종 기준점이 된다. Validator도 결국 이 인터프리터를 기준으로 실행한다.',
-  },
-  'agent_graph.json': {
-    title: '에이전트 그래프 데이터',
-    summary: '노드와 엣지의 배치, 종류, 상태, 정보 흐름을 프론트엔드가 그릴 수 있도록 구조화한 파일이다.',
-    why: '그래프 UI는 이 파일을 읽어서 어떤 에이전트가 어떤 artifact를 만들고, 어떤 정보가 어디로 흐르는지 시각화한다.',
-  },
-  'program_attempts.json': {
-    title: 'Solver 제출 결과 묶음',
-    summary: 'Agent B가 만든 프로그램 시도들을 JSON AST 형태로 저장한 파일이다. 재시도나 변형 버전도 함께 담을 수 있다.',
-    why: 'Validator는 바로 이 파일의 내용을 읽어서 AST로 복원하고 인터프리터에 넣어 실행한다.',
-  },
-  'validator_result.json': {
-    title: '결정론적 검증 결과',
-    summary: '파싱 성공 여부, 실행 성공 여부, 출력 일치 여부 등 Validator의 최종 판정을 담은 파일이다.',
-    why: '이 파일 덕분에 실험이 단순한 인상평이 아니라, 재현 가능한 벤치마크 결과로 남는다.',
-  },
-  'prompts/agentA_interpreter_builder.txt': {
-    title: 'Agent A 프롬프트',
-    summary: '인터프리터를 새로 만들거나 기존 것을 변형하라고 지시하는 프롬프트다.',
-    why: '언어 설계 공간을 어떤 방향으로 탐색할지, 어떤 제약을 둘지 이 프롬프트가 정한다.',
-  },
-  'prompts/agentB_solver.txt': {
-    title: 'Agent B 프롬프트',
-    summary: '선택된 언어 의미론 아래에서 프로그램을 생성하라고 지시하는 프롬프트다.',
-    why: '언어 정의와 실제 Solver 모델 사이를 이어주는 직접적인 인터페이스 역할을 한다.',
+    why: '자연어 설명이 아니라 이 인터프리터가 언어의 최종 기준점이며, Validator도 이 정의를 따른다.',
   },
   'language_spec.json': {
     title: '후보 언어 구조 요약',
-    summary: '후보 점수, 변이 요약, 의미론 모드, 파이프라인 설정 같은 상위 메타데이터를 모아둔 파일이다.',
-    why: '세부 프롬프트와 실행 결과를 보기 전에, 이 후보가 어떤 성격인지 빠르게 파악할 수 있다.',
+    summary: '점수, 변이 요약, 의미론 모드, 파이프라인 설정 같은 상위 메타데이터를 모아둔 파일이다.',
+    why: '세부 프롬프트나 실행 결과를 보기 전에 후보의 성격을 빠르게 파악할 수 있다.',
+  },
+  'ast_schema.json': {
+    title: 'AST 스키마 계약',
+    summary: 'Agent B가 어떤 JSON 구조로 프로그램을 제출해야 하는지 정의한 계약서다.',
+    why: '이 파일이 있어야 Solver 출력이 기계적으로 파싱되고, Validator가 AST로 복원할 수 있다.',
+  },
+  'tasks.json': {
+    title: '벤치마크 태스크 묶음',
+    summary: '후보 언어로 풀어야 할 문제 목록과 기대 동작을 담은 파일이다.',
+    why: 'Agent B는 무엇을 풀지 여기서 읽고, Validator는 실제 실행 결과가 기대 동작과 맞는지 비교한다.',
   },
   'strategy_tree.json': {
     title: '전략 탐색 트리',
     summary: '이 후보가 어떤 전략 family와 leaf에서 나왔는지 구조적으로 기록한 파일이다.',
     why: '현재 후보가 전체 탐색 공간 안에서 어디에 위치하는지 설명해준다.',
   },
+  'agent_graph.json': {
+    title: '에이전트 그래프 데이터',
+    summary: '노드, 엣지, 상태, 좌표, 정보 흐름을 프론트엔드가 그릴 수 있도록 담은 데이터다.',
+    why: '그래프 UI는 이 파일을 읽어서 역할과 정보 흐름을 시각화한다.',
+  },
+  'program_attempts.json': {
+    title: 'Solver 제출 결과 묶음',
+    summary: 'Agent B가 만든 프로그램 시도들을 JSON AST 형태로 저장한 파일이다.',
+    why: 'Validator는 바로 이 파일을 읽어 AST로 복원하고 인터프리터에 넣어 실행한다.',
+  },
+  'validator_result.json': {
+    title: '결정론적 검증 결과',
+    summary: '파싱 성공 여부, 실행 성공 여부, 출력 일치 여부 등 Validator의 최종 판정을 담은 파일이다.',
+    why: '실험을 감상문이 아니라 재현 가능한 벤치마크 결과로 만드는 핵심 산출물이다.',
+  },
   'candidate.json': {
     title: '원본 후보 레코드',
-    summary: '데이터베이스에 저장된 후보의 원본 필드들을 JSON으로 덤프한 파일이다.',
-    why: '가공 전 원본 메타데이터를 그대로 보고 싶을 때 기준점이 된다.',
+    summary: '데이터베이스에 저장된 후보의 원본 필드들을 그대로 덤프한 파일이다.',
+    why: '가공 전 메타데이터를 확인할 때 기준점이 된다.',
   },
   'analysis.json': {
     title: '분석 요약',
-    summary: '실행 결과를 바탕으로 계산된 failure rate나 추가 분석값을 모아둔 파일이다.',
-    why: '후보 언어의 난이도와 특성을 후처리 관점에서 해석할 때 필요하다.',
+    summary: 'failure rate 같은 후처리 분석 결과를 저장한 파일이다.',
+    why: '후보 언어의 난이도와 특성을 실험 해석 관점에서 정리할 때 쓴다.',
   },
   'evaluations.json': {
     title: '개별 평가 결과',
     summary: '모델별·문제별 실행 결과를 한 줄씩 쌓아둔 평가 로그다.',
-    why: '어떤 모델이 어떤 문제에서 실패했는지 세부 레벨에서 추적할 수 있다.',
+    why: '어떤 모델이 어떤 문제에서 실패했는지 세부 수준으로 추적할 수 있다.',
+  },
+  'prompts/agentA_interpreter_builder.txt': {
+    title: 'Agent A 프롬프트',
+    summary: '인터프리터를 생성하거나 변이하라고 지시하는 프롬프트다.',
+    why: '언어 설계 공간을 어떤 방향으로 탐색할지 이 프롬프트가 정한다.',
+  },
+  'prompts/agentB_solver.txt': {
+    title: 'Agent B 프롬프트',
+    summary: '선택된 언어 의미론 아래에서 프로그램을 생성하라고 지시하는 프롬프트다.',
+    why: '언어 정의와 실제 Solver 모델 사이를 연결하는 직접적인 인터페이스다.',
   },
 };
 
@@ -122,16 +123,35 @@ function safeJsonParse(text, fallback) {
   }
 }
 
-function metricCard(label, value, sub = '') {
-  return `<div class="metric-card"><div class="label">${label}</div><div class="value">${value}</div><div class="sub">${sub}</div></div>`;
+function percent(value, digits = 0) {
+  return `${(Number(value || 0) * 100).toFixed(digits)}%`;
 }
 
-function pill(text) {
-  return `<span class="pill">${escapeHtml(text)}</span>`;
+function pill(text, tone = '') {
+  return `<span class="pill ${tone}">${escapeHtml(text)}</span>`;
+}
+
+function metricCard(label, value, sub = '') {
+  return `
+    <div class="metric-card">
+      <div class="label">${escapeHtml(label)}</div>
+      <div class="value">${escapeHtml(String(value))}</div>
+      <div class="sub">${escapeHtml(sub)}</div>
+    </div>
+  `;
 }
 
 function codeBlock(text = '') {
   return `<pre class="code-block">${escapeHtml(text)}</pre>`;
+}
+
+function rawDetails(title, text = '') {
+  return `
+    <details class="raw-details">
+      <summary>${escapeHtml(title)}</summary>
+      ${codeBlock(text)}
+    </details>
+  `;
 }
 
 function inspectorCard(title, bodyHtml) {
@@ -139,11 +159,31 @@ function inspectorCard(title, bodyHtml) {
 }
 
 function kv(label, value) {
-  return `<div class="key-value"><div class="k">${escapeHtml(label)}</div><div class="v">${escapeHtml(value)}</div></div>`;
+  return `
+    <div class="key-value">
+      <div class="k">${escapeHtml(label)}</div>
+      <div class="v">${escapeHtml(String(value))}</div>
+    </div>
+  `;
 }
 
-function benchmarkSection(title, content) {
-  return `<div class="summary-card"><h3>${escapeHtml(title)}</h3>${content}</div>`;
+function panelEmpty(title, copy) {
+  return `
+    <div class="empty-state compact">
+      <div class="empty-title">${escapeHtml(title)}</div>
+      <div class="empty-copy">${escapeHtml(copy)}</div>
+    </div>
+  `;
+}
+
+function emptyInspectorHtml() {
+  return `
+    <div class="empty-state">
+      <div class="empty-icon">◎</div>
+      <div class="empty-title">후보, 노드, 또는 엣지를 선택해줘</div>
+      <div class="empty-copy">오른쪽 인스펙터에는 프롬프트, JSON 계약, 태스크 정의, 실행 결과, 설명 카드가 표시된다.</div>
+    </div>
+  `;
 }
 
 function glossaryHtml(path) {
@@ -158,7 +198,7 @@ function artifactGuideCard(detail) {
   const rows = files.map((path) => {
     const entry = artifactGlossary[path] || {
       title: '보조 아티팩트',
-      summary: '이 파일은 현재 후보 실행 과정에서 생성된 추가 산출물이다.',
+      summary: '실행 과정에서 생성된 추가 산출물이다.',
       why: '필요할 때 raw 내용을 직접 열어 세부 상태를 확인할 수 있다.',
     };
     return `
@@ -172,27 +212,22 @@ function artifactGuideCard(detail) {
   return inspectorCard('아티팩트 전체 설명', `<div class="artifact-guide">${rows}</div>`);
 }
 
-function emptyInspectorHtml() {
-  return `
-    <div class="empty-state">
-      <div class="empty-icon">◎</div>
-      <div class="empty-title">후보, 노드, 또는 엣지를 선택해줘</div>
-      <div class="empty-copy">Inspector에는 프롬프트, JSON 계약, 태스크 정의, 검증 결과 아티팩트가 표시된다.</div>
-    </div>
-  `;
-}
-
 function getArtifact(detail, path) {
   return detail?.artifacts?.files?.[path] || '';
+}
+
+function updateConfigHint(settings, keyInfo) {
+  const modelName = settings?.agent2_model || 'gpt-5.4';
+  const keyText = keyInfo?.configured ? keyInfo.masked : '설정 안 됨';
+  configHint.textContent = `Agent2: ${modelName} · OpenAI key: ${keyText}`;
 }
 
 async function loadConfig() {
   const data = await getJson('/api/config');
   const current = data.settings?.agent2_model || 'gpt-5.4';
-  const keyInfo = data.openai_api_key || { configured: false, masked: null };
   agent2ModelSelect.innerHTML = data.openai_models.map((name) => `<option value="${name}">${name}</option>`).join('');
   agent2ModelSelect.value = current;
-  configHint.textContent = `Agent2: ${current} · OpenAI key: ${keyInfo.configured ? keyInfo.masked : 'not set'}`;
+  updateConfigHint(data.settings, data.openai_api_key);
 }
 
 async function updateConfig(payload) {
@@ -201,27 +236,28 @@ async function updateConfig(payload) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  const current = data.settings?.agent2_model || 'gpt-5.4';
-  const keyInfo = data.openai_api_key || { configured: false, masked: null };
-  configHint.textContent = `Agent2: ${current} · OpenAI key: ${keyInfo.configured ? keyInfo.masked : 'not set'}`;
+  updateConfigHint(data.settings, data.openai_api_key);
   openaiKeyInput.value = '';
   await refreshOverview();
-  if (state.selectedId) await selectCandidate(state.selectedId, false);
+  await refreshCandidates({ autoSelect: false });
+  if (state.selectedId) {
+    await selectCandidate(state.selectedId, { updateInspector: false });
+  }
 }
 
 async function refreshOverview() {
   const data = await getJson('/api/overview');
   state.overview = data;
-  const s = data.state || {};
+  const loopState = data.state || {};
   const hardest = data.hardest || {};
   const settings = data.settings || {};
   summaryBar.innerHTML = [
-    metricCard('Loop Status', (s.status || 'idle').toUpperCase(), s.note || 'waiting for execution'),
-    metricCard('Iteration', s.iteration ?? 0, 'completed rounds'),
-    metricCard('Candidates', data.stats.total_candidates, 'generated candidates'),
-    metricCard('Archived', data.stats.archived_candidates, 'hard-but-valid'),
-    metricCard('Agent 2 Model', settings.agent2_model || 'gpt-5.4', 'current solver'),
-    metricCard('Current Hardest', hardest.name || '—', hardest.failure_rate != null ? `failure ${(hardest.failure_rate * 100).toFixed(0)}%` : 'not available'),
+    metricCard('루프 상태', (loopState.status || 'idle').toUpperCase(), loopState.note || '실행 대기 중'),
+    metricCard('Iteration', loopState.iteration ?? 0, '완료된 라운드 수'),
+    metricCard('후보 수', data.stats.total_candidates, '생성된 candidate'),
+    metricCard('Archive', data.stats.archived_candidates, 'hard-but-valid'),
+    metricCard('Agent 2 모델', settings.agent2_model || 'gpt-5.4', '현재 solver'),
+    metricCard('현재 hardest', hardest.name || '—', hardest.failure_rate != null ? `failure ${percent(hardest.failure_rate)}` : '아직 없음'),
   ].join('');
   renderBenchmark();
 }
@@ -229,65 +265,150 @@ async function refreshOverview() {
 function renderBenchmark() {
   const benchmark = state.overview?.benchmark || { models: [], tasks: [], levels: [] };
 
-  const block = (rows, titleField, valueField, suffix, fallback) => {
-    if (!rows?.length) return `<p>${fallback}</p>`;
-    return rows.map((r) => `
-      <div class="key-value">
-        <div class="k">${escapeHtml(r[titleField])}</div>
-        <div class="v">${suffix} ${(Number(r[valueField] || 0) * 100).toFixed(0)}%</div>
-        <div class="pills">${'n' in r ? pill(`${r.n} samples`) : ''}${'archived_n' in r ? pill(`${r.archived_n} archived`) : ''}</div>
+  const makeSection = (title, rows, titleField, valueField, prefix, fallback) => {
+    if (!rows?.length) {
+      return `<div class="summary-card"><h3>${escapeHtml(title)}</h3><p>${escapeHtml(fallback)}</p></div>`;
+    }
+    return `
+      <div class="summary-card">
+        <h3>${escapeHtml(title)}</h3>
+        <div class="summary-list">
+          ${rows.slice(0, 4).map((row) => `
+            <div class="summary-row">
+              <div class="summary-row-head">
+                <span>${escapeHtml(row[titleField])}</span>
+                <strong>${escapeHtml(prefix)} ${escapeHtml(percent(row[valueField]))}</strong>
+              </div>
+              <div class="pills">
+                ${'n' in row ? pill(`${row.n} samples`) : ''}
+                ${'archived_n' in row ? pill(`${row.archived_n} archived`) : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
       </div>
-    `).join('');
+    `;
   };
 
   benchmarkContent.innerHTML = [
-    benchmarkSection('Models', block(benchmark.models, 'model_name', 'pass_rate', 'Pass', 'No model results yet.')),
-    benchmarkSection('Tasks', block(benchmark.tasks, 'task_name', 'pass_rate', 'Pass', 'No task results yet.')),
-    benchmarkSection('Levels', block(benchmark.levels, 'level', 'avg_failure', 'Failure', 'No level results yet.')),
+    makeSection('모델별', benchmark.models, 'model_name', 'pass_rate', 'Pass', '아직 모델 결과가 없음'),
+    makeSection('문제별', benchmark.tasks, 'task_name', 'pass_rate', 'Pass', '아직 태스크 결과가 없음'),
+    makeSection('레벨별', benchmark.levels, 'level', 'avg_failure', 'Failure', '아직 레벨 결과가 없음'),
   ].join('');
+}
+
+function renderFocusCard() {
+  const detail = state.selectedCandidate;
+  if (!detail) {
+    focusCard.innerHTML = panelEmpty('선택된 candidate가 없음', '왼쪽 후보 목록에서 하나를 고르면 여기에서 핵심 상태를 바로 볼 수 있다.');
+    return;
+  }
+
+  const meta = detail.metadata || {};
+  focusCard.innerHTML = `
+    <div class="focus-hero">
+      <div>
+        <div class="focus-kicker">Selected candidate</div>
+        <div class="focus-title">${escapeHtml(detail.name)}</div>
+        <div class="focus-copy">${escapeHtml(detail.mutation_summary)}</div>
+      </div>
+      <div class="focus-pills">
+        ${pill(detail.level, 'tone-neutral')}
+        ${pill(`failure ${percent(detail.failure_rate)}`, 'tone-accent')}
+        ${pill(meta.strategy_leaf || 'strategy n/a', 'tone-purple')}
+        ${pill(detail.archived ? 'archived' : (detail.status || 'generated'), detail.archived ? 'tone-green' : 'tone-neutral')}
+      </div>
+    </div>
+    <div class="focus-grid">
+      ${kv('Parent', meta.agent1_parent || detail.parent_id || 'None')}
+      ${kv('Agent 2 모델', meta.agent2_model || 'gpt-5.4')}
+      ${kv('Similarity', detail.similarity_score ?? '—')}
+      ${kv('Conflict', detail.conflict_score ?? '—')}
+      ${kv('Solvable', detail.solvable_score ?? '—')}
+      ${kv('Novelty', detail.novelty_score ?? '—')}
+    </div>
+  `;
 }
 
 function filteredCandidates() {
   const q = state.search.trim().toLowerCase();
-  return state.candidates.filter((c) => {
-    if (state.archivedOnly && !c.archived) return false;
+  return state.candidates.filter((candidate) => {
+    if (state.archivedOnly && !candidate.archived) return false;
     if (!q) return true;
-    const meta = c.metadata || {};
-    const hay = `${c.name} ${c.level} ${c.mutation_summary} ${meta.strategy_family || ''} ${meta.strategy_leaf || ''}`.toLowerCase();
+    const meta = candidate.metadata || {};
+    const hay = [
+      candidate.name,
+      candidate.level,
+      candidate.mutation_summary,
+      meta.strategy_family || '',
+      meta.strategy_leaf || '',
+      candidate.status || '',
+    ].join(' ').toLowerCase();
     return hay.includes(q);
   });
 }
 
-function candidateRow(c) {
-  const active = c.id === state.selectedId ? 'active' : '';
-  const meta = c.metadata || {};
+function candidateRow(candidate) {
+  const active = candidate.id === state.selectedId ? 'active' : '';
+  const meta = candidate.metadata || {};
   return `
-    <div class="candidate-item ${active}" data-id="${c.id}">
+    <div class="candidate-item ${active}" data-id="${candidate.id}">
       <div class="candidate-topline">
-        <div class="candidate-title">${escapeHtml(c.name)}</div>
-        <div class="candidate-level">${escapeHtml(c.level)}</div>
+        <div class="candidate-title">${escapeHtml(candidate.name)}</div>
+        <div class="candidate-level">${escapeHtml(candidate.level)}</div>
       </div>
-      <div class="candidate-meta candidate-summary">${escapeHtml(c.mutation_summary)}</div>
+      <div class="candidate-meta candidate-summary">${escapeHtml(candidate.mutation_summary)}</div>
       <div class="pills">
-        ${pill(`failure ${(Number(c.failure_rate || 0) * 100).toFixed(0)}%`)}
-        ${pill(`strategy ${meta.strategy_leaf || 'n/a'}`)}
-        ${pill(c.archived ? 'archived' : (c.status || 'generated'))}
+        ${pill(`failure ${percent(candidate.failure_rate)}`)}
+        ${pill(meta.strategy_leaf || 'strategy n/a')}
+        ${pill(candidate.archived ? 'archived' : (candidate.status || 'generated'))}
       </div>
     </div>
   `;
 }
 
-async function refreshCandidates() {
+function renderCandidateList() {
+  const items = filteredCandidates();
+  if (!items.length) {
+    candidateList.innerHTML = '<div class="candidate-empty">조건에 맞는 후보가 아직 없음</div>';
+    return;
+  }
+  candidateList.innerHTML = items.map(candidateRow).join('');
+  candidateList.querySelectorAll('.candidate-item').forEach((el) => {
+    el.addEventListener('click', () => selectCandidate(el.dataset.id));
+  });
+}
+
+async function refreshCandidates({ autoSelect = true } = {}) {
   const data = await getJson('/api/candidates?limit=80');
   state.candidates = data.items;
-  const items = filteredCandidates();
-  candidateList.innerHTML = items.map(candidateRow).join('') || '<div class="candidate-meta">No candidates match this filter.</div>';
-  candidateList.querySelectorAll('.candidate-item').forEach((el) => {
-    el.addEventListener('click', () => selectCandidate(el.dataset.id, true));
-  });
-  if (!state.selectedId && items[0]) {
-    await selectCandidate(items[0].id, true);
+  renderCandidateList();
+
+  if (state.selectedId) {
+    const stillExists = state.candidates.some((item) => item.id === state.selectedId);
+    if (!stillExists) {
+      clearSelection();
+    }
   }
+
+  const items = filteredCandidates();
+  if (autoSelect && !state.selectedId && items[0]) {
+    await selectCandidate(items[0].id, { updateInspector: true });
+  }
+}
+
+function clearSelection() {
+  state.selectedId = null;
+  state.selectedCandidate = null;
+  state.selectedTreeNode = 'root';
+  state.selectedGraphNode = null;
+  state.selectedGraphEdge = null;
+  selectedHint.textContent = '후보를 선택해줘';
+  renderFocusCard();
+  strategyTreeStage.innerHTML = panelEmpty('전략 트리가 비어 있음', '후보를 선택하면 어떤 전략 family와 leaf에서 나왔는지 여기에 표시된다.');
+  graphStage.innerHTML = panelEmpty('실행 그래프가 비어 있음', '후보를 선택하면 Agent A → Agent B → Validator 흐름이 여기 나타난다.');
+  inspectorContent.className = 'inspector empty';
+  inspectorContent.innerHTML = emptyInspectorHtml();
 }
 
 function renderTreeNode(nodeId, tree) {
@@ -307,6 +428,11 @@ function renderTreeNode(nodeId, tree) {
 }
 
 function renderStrategyTree(tree) {
+  if (!tree?.nodes || !Object.keys(tree.nodes).length) {
+    strategyTreeStage.innerHTML = panelEmpty('전략 데이터가 없음', '이 candidate의 전략 트리 정보가 아직 생성되지 않았다.');
+    return;
+  }
+
   strategyTreeStage.innerHTML = `<ul class="tree-list">${renderTreeNode('root', tree)}</ul>`;
   strategyTreeStage.querySelectorAll('[data-node-id]').forEach((el) => {
     el.addEventListener('click', (evt) => {
@@ -318,7 +444,7 @@ function renderStrategyTree(tree) {
       if (node.kind === 'family' || node.kind === 'strategy') {
         state.search = nodeId;
         searchInput.value = nodeId;
-        refreshCandidates();
+        renderCandidateList();
       }
       showTreeInspector(nodeId, node, tree);
     });
@@ -330,44 +456,49 @@ function isNodeEdgeRelated(nodeId, edge) {
 }
 
 function renderAgentGraph(graph) {
-  const width = 1520;
-  const height = 390;
-  const boxW = 156;
-  const boxH = 68;
-  const byId = Object.fromEntries((graph.nodes || []).map((n) => [n.id, n]));
-  const selectedEdge = (graph.edges || []).find((e) => e.id === state.selectedGraphEdge) || null;
+  if (!graph?.nodes?.length) {
+    graphStage.innerHTML = panelEmpty('그래프 데이터가 없음', '후보가 생성되면 에이전트와 아티팩트 흐름이 여기에 표시된다.');
+    return;
+  }
 
-  const edgeSvg = (graph.edges || []).map((e) => {
-    const a = byId[e.source];
-    const b = byId[e.target];
-    if (!a || !b) return '';
-    const x1 = a.x + boxW / 2;
-    const y1 = a.y + boxH / 2;
-    const x2 = b.x + boxW / 2;
-    const y2 = b.y + boxH / 2;
+  const width = 1560;
+  const height = 420;
+  const boxW = 174;
+  const boxH = 82;
+  const byId = Object.fromEntries((graph.nodes || []).map((node) => [node.id, node]));
+  const selectedEdge = (graph.edges || []).find((edge) => edge.id === state.selectedGraphEdge) || null;
+
+  const edgeSvg = (graph.edges || []).map((edge) => {
+    const source = byId[edge.source];
+    const target = byId[edge.target];
+    if (!source || !target) return '';
+    const x1 = source.x + boxW / 2;
+    const y1 = source.y + boxH / 2;
+    const x2 = target.x + boxW / 2;
+    const y2 = target.y + boxH / 2;
     const mx = (x1 + x2) / 2;
-    const my = (y1 + y2) / 2 - 12;
-    const labelWidth = Math.max(88, (String(e.label || '').length * 7) + 18);
-    const active = state.selectedGraphEdge === e.id ? 'active' : '';
+    const my = (y1 + y2) / 2 - 16;
+    const labelWidth = Math.max(110, String(edge.label || '').length * 7 + 24);
+    const active = state.selectedGraphEdge === edge.id ? 'active' : '';
     return `
-      <g class="graph-edge-group ${active}" data-edge-id="${e.id}">
+      <g class="graph-edge-group ${active}" data-edge-id="${edge.id}">
         <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="graph-edge-base" marker-end="url(#arrow)" />
         <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="graph-edge-hit" />
-        <rect x="${mx - labelWidth / 2}" y="${my - 15}" width="${labelWidth}" height="22" class="graph-edge-chip"></rect>
-        <text x="${mx}" y="${my}" text-anchor="middle" dominant-baseline="middle" class="graph-edge-label">${escapeHtml(e.label || '')}</text>
+        <rect x="${mx - labelWidth / 2}" y="${my - 15}" width="${labelWidth}" height="24" class="graph-edge-chip"></rect>
+        <text x="${mx}" y="${my - 2}" text-anchor="middle" dominant-baseline="middle" class="graph-edge-label">${escapeHtml(edge.label || '')}</text>
       </g>
     `;
   }).join('');
 
-  const nodeSvg = (graph.nodes || []).map((n) => {
-    const active = state.selectedGraphNode === n.id;
-    const dimmed = (state.selectedGraphNode && !active) || (selectedEdge && !isNodeEdgeRelated(n.id, selectedEdge));
-    const groupClass = ['graph-node-group', active ? 'active' : '', dimmed ? 'dimmed' : ''].filter(Boolean).join(' ');
+  const nodeSvg = (graph.nodes || []).map((node) => {
+    const active = state.selectedGraphNode === node.id;
+    const dimmed = (state.selectedGraphNode && !active) || (selectedEdge && !isNodeEdgeRelated(node.id, selectedEdge));
+    const className = ['graph-node-group', active ? 'active' : '', dimmed ? 'dimmed' : ''].filter(Boolean).join(' ');
     return `
-      <g transform="translate(${n.x},${n.y})" class="${groupClass}" data-node-id="${n.id}">
-        <rect class="graph-node ${n.kind || ''} ${n.status || ''}" rx="18" ry="18" width="${boxW}" height="${boxH}"></rect>
-        <text x="14" y="16" class="graph-node-kind">${escapeHtml(n.kind || 'node')}</text>
-        <text x="${boxW / 2}" y="38" text-anchor="middle" class="graph-label">${String(n.label).split('\n').map((line, idx) => `<tspan x="${boxW / 2}" dy="${idx === 0 ? 0 : 17}">${escapeHtml(line)}</tspan>`).join('')}</text>
+      <g transform="translate(${node.x},${node.y})" class="${className}" data-node-id="${node.id}">
+        <rect class="graph-node ${node.kind || ''} ${node.status || ''}" rx="20" ry="20" width="${boxW}" height="${boxH}"></rect>
+        <text x="14" y="18" class="graph-node-kind">${escapeHtml(node.kind || 'node')}</text>
+        <text x="${boxW / 2}" y="42" text-anchor="middle" class="graph-label">${String(node.label || '').split('\n').map((line, idx) => `<tspan x="${boxW / 2}" dy="${idx === 0 ? 0 : 18}">${escapeHtml(line)}</tspan>`).join('')}</text>
       </g>
     `;
   }).join('');
@@ -389,17 +520,17 @@ function renderAgentGraph(graph) {
       state.selectedGraphNode = el.dataset.nodeId;
       state.selectedGraphEdge = null;
       renderAgentGraph(graph);
-      const node = byId[el.dataset.nodeId];
-      showNodeInspector(node, graph);
+      showNodeInspector(byId[el.dataset.nodeId]);
     });
   });
+
   graphStage.querySelectorAll('.graph-edge-group').forEach((el) => {
     el.addEventListener('click', () => {
       state.selectedGraphEdge = el.dataset.edgeId;
       state.selectedGraphNode = null;
       renderAgentGraph(graph);
-      const edge = (graph.edges || []).find((e) => e.id === el.dataset.edgeId);
-      showEdgeInspector(edge, graph);
+      const edge = (graph.edges || []).find((item) => item.id === el.dataset.edgeId);
+      showEdgeInspector(edge);
     });
   });
 }
@@ -412,9 +543,9 @@ function showCandidateInspector(detail) {
       ${inspectorCard('후보 요약', `
         <p><strong>${escapeHtml(detail.name)}</strong> (${escapeHtml(detail.level)})<br>${escapeHtml(detail.mutation_summary)}</p>
         <div class="pills">
-          ${pill(`failure ${(Number(detail.failure_rate || 0) * 100).toFixed(0)}%`)}
-          ${pill(`strategy ${meta.strategy_leaf || 'n/a'}`)}
-          ${pill(detail.archived ? 'archived' : (detail.status || 'generated'))}
+          ${pill(`failure ${percent(detail.failure_rate)}`, 'tone-accent')}
+          ${pill(meta.strategy_leaf || 'strategy n/a', 'tone-purple')}
+          ${pill(detail.archived ? 'archived' : (detail.status || 'generated'), detail.archived ? 'tone-green' : '')}
         </div>
       `)}
       ${inspectorCard('파이프라인 한눈에 보기', `
@@ -422,18 +553,18 @@ function showCandidateInspector(detail) {
           ${kv('Agent A', '인터프리터 생성 / 변이')}
           ${kv('Agent B', 'JSON AST 프로그램 제출')}
           ${kv('Validator', 'JSON → AST → 실행')}
-          ${kv('Format', '기계 검증 가능한 아티팩트')}
+          ${kv('Format', '기계 검증 가능한 산출물')}
         </div>
       `)}
-      ${inspectorCard('ast_schema.json / tasks.json 이란?', `
+      ${inspectorCard('핵심 파일 두 개', `
         <div class="inspector-grid">
-          ${kv('ast_schema.json', 'Solver가 따라야 하는 JSON AST 필드 계약')}
-          ${kv('tasks.json', '벤치마크 문제 목록 + 기대 동작')}
+          ${kv('ast_schema.json', 'Solver가 따라야 하는 JSON AST 형식 계약')}
+          ${kv('tasks.json', '문제 목록과 기대 동작 정의')}
         </div>
       `)}
       ${artifactGuideCard(detail)}
       ${glossaryHtml('language_spec.json')}
-      ${inspectorCard('language_spec.json', codeBlock(getArtifact(detail, 'language_spec.json')))}
+      ${rawDetails('language_spec.json raw 보기', getArtifact(detail, 'language_spec.json'))}
     </div>
   `;
 }
@@ -444,15 +575,16 @@ function showTreeInspector(nodeId, node, tree) {
   inspectorContent.innerHTML = `
     <div class="inspector-section">
       ${inspectorCard('전략 노드', `<p><strong>${escapeHtml(node.label || nodeId)}</strong><br>kind: ${escapeHtml(node.kind || '')}<br>status: ${escapeHtml(node.status || '')}${node.score != null ? `<br>score: ${node.score}` : ''}${node.note ? `<br>${escapeHtml(node.note)}` : ''}</p>`)}
-      ${inspectorCard('선택된 경로', `<p>${(tree.selected_path || []).map((x) => escapeHtml(x)).join(' → ')}</p>`)}
-      ${detail ? inspectorCard('현재 후보의 전략 메타데이터', codeBlock(JSON.stringify({ strategy_family: detail.metadata?.strategy_family, strategy_leaf: detail.metadata?.strategy_leaf }, null, 2))) : ''}
+      ${inspectorCard('선택된 경로', `<p>${(tree.selected_path || []).map((item) => escapeHtml(item)).join(' → ')}</p>`)}
+      ${detail ? inspectorCard('현재 후보의 전략 메타데이터', rawDetails('metadata raw 보기', JSON.stringify({ strategy_family: detail.metadata?.strategy_family, strategy_leaf: detail.metadata?.strategy_leaf }, null, 2))) : ''}
     </div>
   `;
 }
 
-function showNodeInspector(node, graph) {
+function showNodeInspector(node) {
   const detail = state.selectedCandidate;
   if (!detail || !node) return;
+
   const pathMap = {
     strategy_root: 'strategy_tree.json',
     agent_a: 'prompts/agentA_interpreter_builder.txt',
@@ -464,56 +596,119 @@ function showNodeInspector(node, graph) {
     validator: 'validator_result.json',
     result: 'validator_result.json',
   };
+
   const file = pathMap[node.id] || 'candidate.json';
   inspectorContent.classList.remove('empty');
   inspectorContent.innerHTML = `
     <div class="inspector-section">
       ${inspectorCard('선택한 노드', `<p><strong>${escapeHtml(node.label)}</strong><br>kind: ${escapeHtml(node.kind || '')}<br>status: ${escapeHtml(node.status || '')}</p>`)}
       ${glossaryHtml(file)}
-      ${inspectorCard('연결된 아티팩트', `<p>${escapeHtml(file)}</p>${codeBlock(getArtifact(detail, file))}`)}
+      ${rawDetails(`${file} raw 보기`, getArtifact(detail, file))}
     </div>
   `;
 }
 
-function showEdgeInspector(edge, graph) {
+function showEdgeInspector(edge) {
   const detail = state.selectedCandidate;
   if (!detail || !edge) return;
   const inspectPath = edge.inspect === 'strategy' ? 'strategy_tree.json' : (edge.inspect || 'candidate.json');
-  const preview = getArtifact(detail, inspectPath);
   inspectorContent.classList.remove('empty');
   inspectorContent.innerHTML = `
     <div class="inspector-section">
       ${inspectorCard('정보 교환 설명', `<p><strong>${escapeHtml(edge.label || edge.id)}</strong><br>${escapeHtml(edge.source)} → ${escapeHtml(edge.target)}<br>${escapeHtml(edge.exchange || '')}</p>`)}
       ${glossaryHtml(inspectPath)}
-      ${inspectorCard('검사 중인 아티팩트', `<p>${escapeHtml(inspectPath)}</p>${codeBlock(preview)}`)}
+      ${rawDetails(`${inspectPath} raw 보기`, getArtifact(detail, inspectPath))}
     </div>
   `;
 }
 
-async function selectCandidate(id, updateInspector = true) {
+async function selectCandidate(id, { updateInspector = true } = {}) {
   state.selectedId = id;
   const detail = await getJson(`/api/candidates/${id}`);
   state.selectedCandidate = detail;
   selectedHint.textContent = `${detail.name} · ${detail.level}`;
+  renderFocusCard();
 
   const tree = safeJsonParse(getArtifact(detail, 'strategy_tree.json') || '{"nodes":{},"edges":[]}', { nodes: {}, edges: [] });
   const graph = safeJsonParse(getArtifact(detail, 'agent_graph.json') || '{"nodes":[],"edges":[]}', { nodes: [], edges: [] });
+
   state.selectedTreeNode = tree.selected_path?.[tree.selected_path.length - 1] || 'root';
   state.selectedGraphNode = null;
   state.selectedGraphEdge = null;
+
+  renderCandidateList();
   renderStrategyTree(tree);
   renderAgentGraph(graph);
-  if (updateInspector) showCandidateInspector(detail);
-  await refreshCandidates();
+
+  if (updateInspector) {
+    showCandidateInspector(detail);
+  }
+}
+
+function eventSummary(event) {
+  const payload = event.payload || {};
+  switch (event.kind) {
+    case 'bootstrap':
+      return {
+        title: '초기화 완료',
+        summary: payload.note || payload.message || '빈 상태 부트스트랩이 완료됨',
+      };
+    case 'loop_started':
+      return {
+        title: '루프 시작',
+        summary: payload.message || 'Agent loop가 시작됨',
+      };
+    case 'loop_paused':
+      return {
+        title: '루프 일시정지',
+        summary: payload.message || 'Agent loop가 멈춤',
+      };
+    case 'loop_reset':
+      return {
+        title: '루프 리셋',
+        summary: payload.message || '상태와 후보가 모두 초기화됨',
+      };
+    case 'candidate_generated':
+      return {
+        title: `${payload.name || payload.candidate_id || 'candidate'} 생성`,
+        summary: `iteration ${payload.iteration || '-'} · level ${payload.level || '-'}${payload.parent ? ` · parent ${payload.parent}` : ''}`,
+      };
+    case 'benchmark_completed':
+      return {
+        title: '벤치마크 완료',
+        summary: `${payload.candidate_id || ''} · failure ${percent(payload.failure_rate)}${payload.archived ? ' · archive 진입' : ''}`,
+      };
+    case 'archive_updated':
+      return {
+        title: 'Archive 업데이트',
+        summary: payload.message || '새 hardest candidate가 archive에 추가됨',
+      };
+    case 'config_updated':
+      return {
+        title: '설정 변경',
+        summary: payload.message || '설정이 갱신됨',
+      };
+    default:
+      return {
+        title: event.kind,
+        summary: payload.message || '세부 payload를 열어 확인할 수 있음',
+      };
+  }
 }
 
 function addEventItem(event) {
+  const info = eventSummary(event);
   const el = document.createElement('div');
   el.className = 'event-item';
   el.innerHTML = `
-    <div class="kind">${escapeHtml(event.kind)}</div>
-    <div class="candidate-meta">${new Date(event.created_at).toLocaleString()}</div>
-    ${codeBlock(JSON.stringify(event.payload, null, 2))}
+    <div class="event-head">
+      <div>
+        <div class="kind">${escapeHtml(info.title)}</div>
+        <div class="event-summary">${escapeHtml(info.summary)}</div>
+      </div>
+      <div class="candidate-meta">${new Date(event.created_at).toLocaleString()}</div>
+    </div>
+    ${rawDetails('payload raw 보기', JSON.stringify(event.payload, null, 2))}
   `;
   eventList.prepend(el);
 }
@@ -521,27 +716,37 @@ function addEventItem(event) {
 async function preloadEvents() {
   const data = await getJson('/api/events?limit=40');
   eventList.innerHTML = '';
-  data.items.forEach((e) => {
-    state.lastEventId = Math.max(state.lastEventId, e.id);
-    addEventItem(e);
+  data.items.forEach((event) => {
+    state.lastEventId = Math.max(state.lastEventId, event.id);
+    addEventItem(event);
   });
+}
+
+async function refreshSelectedIfNeeded() {
+  if (!state.selectedId) return;
+  const exists = state.candidates.some((item) => item.id === state.selectedId);
+  if (!exists) {
+    clearSelection();
+    return;
+  }
+  await selectCandidate(state.selectedId, { updateInspector: false });
 }
 
 async function post(url) {
   await getJson(url, { method: 'POST' });
   await refreshOverview();
-  await refreshCandidates();
-  if (state.selectedId) await selectCandidate(state.selectedId, false);
+  await refreshCandidates({ autoSelect: false });
+  await refreshSelectedIfNeeded();
 }
 
-searchInput.addEventListener('input', async (e) => {
+searchInput.addEventListener('input', (e) => {
   state.search = e.target.value;
-  await refreshCandidates();
+  renderCandidateList();
 });
 
-archivedOnlyInput.addEventListener('change', async (e) => {
+archivedOnlyInput.addEventListener('change', (e) => {
   state.archivedOnly = e.target.checked;
-  await refreshCandidates();
+  renderCandidateList();
 });
 
 agent2ModelSelect.addEventListener('change', async (e) => {
@@ -564,35 +769,34 @@ document.getElementById('pauseBtn').addEventListener('click', () => post('/api/l
 document.getElementById('stepBtn').addEventListener('click', () => post('/api/loop/step'));
 document.getElementById('resetBtn').addEventListener('click', async () => {
   await post('/api/loop/reset');
-  state.selectedId = null;
-  state.selectedCandidate = null;
-  state.selectedTreeNode = 'root';
-  state.selectedGraphNode = null;
-  state.selectedGraphEdge = null;
-  selectedHint.textContent = 'Select a candidate';
-  strategyTreeStage.innerHTML = '';
-  graphStage.innerHTML = '';
-  inspectorContent.className = 'inspector empty';
-  inspectorContent.innerHTML = emptyInspectorHtml();
+  clearSelection();
+  renderCandidateList();
 });
 
 function connectEvents() {
   const source = new EventSource('/api/events/stream');
-  source.onopen = () => { eventStatus.textContent = 'live'; };
-  source.onerror = () => { eventStatus.textContent = 'reconnecting…'; };
+  source.onopen = () => {
+    eventStatus.textContent = 'live';
+  };
+  source.onerror = () => {
+    eventStatus.textContent = 'reconnecting…';
+  };
   source.onmessage = async (msg) => {
     const event = JSON.parse(msg.data);
     if (event.id <= state.lastEventId) return;
     state.lastEventId = event.id;
     addEventItem(event);
     await refreshOverview();
-    await refreshCandidates();
-    if (state.selectedId) await selectCandidate(state.selectedId, false);
+    await refreshCandidates({ autoSelect: false });
+    await refreshSelectedIfNeeded();
   };
 }
 
 async function init() {
   inspectorContent.innerHTML = emptyInspectorHtml();
+  renderFocusCard();
+  strategyTreeStage.innerHTML = panelEmpty('전략 트리가 비어 있음', '후보를 선택하면 여기에 전략 탐색 구조가 나타난다.');
+  graphStage.innerHTML = panelEmpty('실행 그래프가 비어 있음', '후보를 선택하면 Agent A → Agent B → Validator 흐름이 나타난다.');
   await loadConfig();
   await refreshOverview();
   await preloadEvents();

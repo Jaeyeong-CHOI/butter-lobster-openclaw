@@ -4,11 +4,13 @@ import json
 import sqlite3
 from contextlib import contextmanager
 from pathlib import Path
+import shutil
 from typing import Any, Iterator
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "loop.db"
 SECRETS_PATH = BASE_DIR / "data" / "secrets.json"
+CANDIDATE_ROOT = BASE_DIR / "data" / "candidates"
 
 DEFAULT_SETTINGS = {
     "agent2_model": "gpt-5.4",
@@ -360,3 +362,6 @@ def reset_all() -> None:
         conn.execute(
             "UPDATE loop_state SET status = 'idle', iteration = 0, updated_at = datetime('now'), note = 'Loop reset' WHERE id = 1"
         )
+    if CANDIDATE_ROOT.exists():
+        shutil.rmtree(CANDIDATE_ROOT)
+    CANDIDATE_ROOT.mkdir(parents=True, exist_ok=True)
