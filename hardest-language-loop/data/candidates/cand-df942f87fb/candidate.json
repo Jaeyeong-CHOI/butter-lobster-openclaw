@@ -1,0 +1,28 @@
+{
+  "id": "cand-df942f87fb",
+  "parent_id": "seed-2f933b4c",
+  "level": "L3",
+  "name": "PL-027 L3",
+  "mutation_summary": "Inverted-if semantics",
+  "interpreter_hint": "Conditionals execute on FALSE; comparison and boolean behavior partially conflict with Python.",
+  "similarity_score": 0.948,
+  "conflict_score": 0.929,
+  "solvable_score": 0.758,
+  "novelty_score": 0.687,
+  "failure_rate": 0.0,
+  "archived": false,
+  "status": "generated",
+  "metadata": {
+    "prompt_mode_default": "interpreter_as_spec",
+    "agent1_parent": "L3 InvertedIf Seed",
+    "agent2_model": "gpt-5.4",
+    "python_near": true,
+    "task_bank": [
+      "abs",
+      "max",
+      "fib",
+      "gcd"
+    ]
+  },
+  "created_at": "2026-04-21T06:08:33.788921+00:00"
+}

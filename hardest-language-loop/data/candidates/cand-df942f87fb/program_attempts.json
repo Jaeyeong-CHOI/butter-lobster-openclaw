@@ -1,0 +1,116 @@
+{
+  "candidate_id": "cand-df942f87fb",
+  "submission_contract": "Agent B must return machine-parseable JSON AST, not free-form code text.",
+  "attempts": [
+    {
+      "format": "json_ast_v1",
+      "task_name": "abs",
+      "model_name": "gpt-5.4",
+      "program": {
+        "type": "LETF",
+        "name": "abs",
+        "params": [
+          "n"
+        ],
+        "body": {
+          "type": "IF",
+          "note": "MVP placeholder AST; replace with real Agent B output"
+        },
+        "in": {
+          "type": "CALLV",
+          "name": "abs",
+          "args": [
+            {
+              "type": "NUM",
+              "value": 6
+            }
+          ]
+        }
+      },
+      "expected_success": true
+    },
+    {
+      "format": "json_ast_v1",
+      "task_name": "max",
+      "model_name": "gpt-5.4",
+      "program": {
+        "type": "LETF",
+        "name": "max",
+        "params": [
+          "x",
+          "y"
+        ],
+        "body": {
+          "type": "IF",
+          "note": "MVP placeholder AST; replace with real Agent B output"
+        },
+        "in": {
+          "type": "CALLV",
+          "name": "max",
+          "args": [
+            {
+              "type": "NUM",
+              "value": 6
+            }
+          ]
+        }
+      },
+      "expected_success": true
+    },
+    {
+      "format": "json_ast_v1",
+      "task_name": "fib",
+      "model_name": "gpt-5.4",
+      "program": {
+        "type": "LETF",
+        "name": "fib",
+        "params": [
+          "n"
+        ],
+        "body": {
+          "type": "IF",
+          "note": "MVP placeholder AST; replace with real Agent B output"
+        },
+        "in": {
+          "type": "CALLV",
+          "name": "fib",
+          "args": [
+            {
+              "type": "NUM",
+              "value": 6
+            }
+          ]
+        }
+      },
+      "expected_success": false
+    },
+    {
+      "format": "json_ast_v1",
+      "task_name": "gcd",
+      "model_name": "gpt-5.4",
+      "program": {
+        "type": "LETF",
+        "name": "gcd",
+        "params": [
+          "x",
+          "y"
+        ],
+        "body": {
+          "type": "IF",
+          "note": "MVP placeholder AST; replace with real Agent B output"
+        },
+        "in": {
+          "type": "CALLV",
+          "name": "gcd",
+          "args": [
+            {
+              "type": "NUM",
+              "value": 6
+            }
+          ]
+        }
+      },
+      "expected_success": false
+    }
+  ]
+}

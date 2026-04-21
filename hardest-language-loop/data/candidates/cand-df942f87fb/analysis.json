@@ -1,0 +1,21 @@
+{
+  "failure_rate": 0.5,
+  "archived": false,
+  "status": "discarded",
+  "metadata": {
+    "prompt_mode_default": "interpreter_as_spec",
+    "agent1_parent": "L3 InvertedIf Seed",
+    "agent2_model": "gpt-5.4",
+    "python_near": true,
+    "task_bank": [
+      "abs",
+      "max",
+      "fib",
+      "gcd"
+    ],
+    "hardest_models": [],
+    "total_failures": 2,
+    "total_evals": 4,
+    "prior_boundary": true
+  }
+}

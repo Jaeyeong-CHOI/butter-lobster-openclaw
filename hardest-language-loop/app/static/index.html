@@ -17,6 +17,14 @@
           <span>Agent 2 Model</span>
           <select id="agent2ModelSelect"></select>
         </label>
+        <label class="select-wrap key-wrap">
+          <span>OpenAI API Key</span>
+          <div class="key-controls">
+            <input id="openaiKeyInput" type="password" placeholder="sk-..." />
+            <button id="saveKeyBtn" class="secondary">Save Key</button>
+            <button id="clearKeyBtn" class="secondary">Clear</button>
+          </div>
+        </label>
         <span id="configHint" class="hint">Applies to new iterations</span>
         <button id="startBtn">Start Loop</button>
         <button id="pauseBtn" class="secondary">Pause</button>

@@ -1,0 +1,52 @@
+{
+  "candidate_id": "cand-df942f87fb",
+  "validator_mode": "json -> schema check -> AST reconstruction -> interpreter execution -> output comparison",
+  "summary": {
+    "total_evaluations": 4,
+    "total_success": 2,
+    "total_failure": 2,
+    "failure_rate": 0.5
+  },
+  "rows": [
+    {
+      "model_name": "gpt-5.4",
+      "task_name": "abs",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 1.0,
+      "notes": ""
+    },
+    {
+      "model_name": "gpt-5.4",
+      "task_name": "max",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": true,
+      "success": true,
+      "score": 1.0,
+      "notes": ""
+    },
+    {
+      "model_name": "gpt-5.4",
+      "task_name": "fib",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.342,
+      "notes": "Fails on prior-entrenched task"
+    },
+    {
+      "model_name": "gpt-5.4",
+      "task_name": "gcd",
+      "parse_ok": true,
+      "execution_ok": true,
+      "outputs_match": false,
+      "success": false,
+      "score": 0.501,
+      "notes": "Fails on prior-entrenched task"
+    }
+  ]
+}

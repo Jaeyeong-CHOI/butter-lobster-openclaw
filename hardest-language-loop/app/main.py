@@ -53,6 +53,7 @@ async def api_config() -> JSONResponse:
         {
             "settings": settings,
             "openai_models": list(OPENAI_MODEL_CATALOG.keys()),
+            "openai_api_key": store.get_openai_api_key_status(),
         }
     )
 
@@ -60,6 +61,8 @@ async def api_config() -> JSONResponse:
 @app.post("/api/config")
 async def api_config_update(payload: dict = Body(...)) -> JSONResponse:
     agent2_model = payload.get("agent2_model")
+    openai_api_key = payload.get("openai_api_key")
+    clear_openai_api_key = payload.get("clear_openai_api_key")
     if agent2_model is not None:
         if agent2_model not in OPENAI_MODEL_CATALOG:
             raise HTTPException(status_code=400, detail="Unknown Agent 2 model")
@@ -73,7 +76,32 @@ async def api_config_update(payload: dict = Body(...)) -> JSONResponse:
             },
             datetime.now(timezone.utc).isoformat(),
         )
-    return JSONResponse({"ok": True, "settings": store.get_settings(), "openai_models": list(OPENAI_MODEL_CATALOG.keys())})
+    if isinstance(openai_api_key, str) and openai_api_key.strip():
+        store.set_openai_api_key(openai_api_key.strip())
+        store.insert_event(
+            "config_updated",
+            {
+                "message": "OpenAI API key updated",
+                "configured": True,
+            },
+            datetime.now(timezone.utc).isoformat(),
+        )
+    if clear_openai_api_key:
+        store.clear_openai_api_key()
+        store.insert_event(
+            "config_updated",
+            {
+                "message": "OpenAI API key cleared",
+                "configured": False,
+            },
+            datetime.now(timezone.utc).isoformat(),
+        )
+    return JSONResponse({
+        "ok": True,
+        "settings": store.get_settings(),
+        "openai_models": list(OPENAI_MODEL_CATALOG.keys()),
+        "openai_api_key": store.get_openai_api_key_status(),
+    })
 
 
 @app.get("/api/candidates")

@@ -114,6 +114,21 @@ button.tab.active { background: rgba(35, 116, 255, 0.08); color: var(--accent); 
   padding: 10px 12px;
   font-weight: 600;
 }
+.key-wrap { min-width: 360px; }
+.key-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.key-controls input {
+  min-width: 220px;
+  flex: 1;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
 .checkbox { font-size: 13px; color: var(--muted); white-space: nowrap; }
 .candidate-list, .event-list {
   max-height: 560px;

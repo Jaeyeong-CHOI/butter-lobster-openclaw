@@ -19,6 +19,9 @@ const searchInput = document.getElementById('searchInput');
 const archivedOnlyInput = document.getElementById('archivedOnly');
 const agent2ModelSelect = document.getElementById('agent2ModelSelect');
 const configHint = document.getElementById('configHint');
+const openaiKeyInput = document.getElementById('openaiKeyInput');
+const saveKeyBtn = document.getElementById('saveKeyBtn');
+const clearKeyBtn = document.getElementById('clearKeyBtn');
 
 async function getJson(url, options = {}) {
   const res = await fetch(url, options);
@@ -46,7 +49,8 @@ async function loadConfig() {
   const current = data.settings?.agent2_model || 'gpt-5.4';
   agent2ModelSelect.innerHTML = data.openai_models.map((name) => `<option value="${name}">${name}</option>`).join('');
   agent2ModelSelect.value = current;
-  configHint.textContent = `Current Agent 2: ${current} · applies to new iterations`;
+  const keyInfo = data.openai_api_key || { configured: false, masked: null };
+  configHint.textContent = `Current Agent 2: ${current} · OpenAI key: ${keyInfo.configured ? keyInfo.masked : 'not set'}`;
 }
 
 async function refreshOverview() {
@@ -336,7 +340,9 @@ async function updateConfig(payload) {
     body: JSON.stringify(payload),
   });
   const current = data.settings?.agent2_model || 'gpt-5.4';
-  configHint.textContent = `Current Agent 2: ${current} · reset loop for a clean benchmark history`;
+  const keyInfo = data.openai_api_key || { configured: false, masked: null };
+  configHint.textContent = `Current Agent 2: ${current} · OpenAI key: ${keyInfo.configured ? keyInfo.masked : 'not set'}`;
+  openaiKeyInput.value = '';
   await refreshOverview();
   if (state.selectedId) await selectCandidate(state.selectedId);
 }
@@ -362,6 +368,15 @@ archivedOnlyInput.addEventListener('change', async (e) => {
 });
 agent2ModelSelect.addEventListener('change', async (e) => {
   await updateConfig({ agent2_model: e.target.value });
+});
+saveKeyBtn.addEventListener('click', async () => {
+  const value = openaiKeyInput.value.trim();
+  if (!value) return;
+  await updateConfig({ openai_api_key: value });
+});
+clearKeyBtn.addEventListener('click', async () => {
+  openaiKeyInput.value = '';
+  await updateConfig({ clear_openai_api_key: true });
 });
 
 document.querySelectorAll('.tab').forEach((tab) => {

@@ -8,10 +8,57 @@ from typing import Any, Iterator
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "loop.db"
+SECRETS_PATH = BASE_DIR / "data" / "secrets.json"
 
 DEFAULT_SETTINGS = {
     "agent2_model": "gpt-5.4",
 }
+
+
+def _read_secrets() -> dict[str, Any]:
+    if not SECRETS_PATH.exists():
+        return {}
+    try:
+        return json.loads(SECRETS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _write_secrets(data: dict[str, Any]) -> None:
+    SECRETS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SECRETS_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        SECRETS_PATH.chmod(0o600)
+    except Exception:
+        pass
+
+
+def set_openai_api_key(api_key: str) -> None:
+    secrets = _read_secrets()
+    secrets["openai_api_key"] = api_key
+    _write_secrets(secrets)
+
+
+def clear_openai_api_key() -> None:
+    secrets = _read_secrets()
+    secrets.pop("openai_api_key", None)
+    _write_secrets(secrets)
+
+
+def get_openai_api_key() -> str | None:
+    value = _read_secrets().get("openai_api_key")
+    return value if isinstance(value, str) and value else None
+
+
+def get_openai_api_key_status() -> dict[str, Any]:
+    key = get_openai_api_key()
+    if not key:
+        return {"configured": False, "masked": None}
+    if len(key) <= 10:
+        masked = "*" * len(key)
+    else:
+        masked = f"{key[:7]}...{key[-4:]}"
+    return {"configured": True, "masked": masked}
 
 
 def row_to_dict(row: sqlite3.Row | None) -> dict[str, Any] | None:
