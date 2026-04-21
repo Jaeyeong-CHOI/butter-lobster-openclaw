@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import store
-from .artifacts import load_candidate_bundle, materialize_candidate_bundle
+from .artifacts import load_candidate_bundle
 from .engine import AgentLoopService, OPENAI_MODEL_CATALOG, THINKING_OPTIONS
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -204,21 +204,6 @@ async def api_candidate(candidate_id: str) -> JSONResponse:
     item = store.get_candidate(candidate_id)
     if item is None:
         raise HTTPException(status_code=404, detail="Candidate not found")
-    parent_name = None
-    if item.get("parent_id"):
-        parent = store.get_candidate(item["parent_id"])
-        parent_name = parent.get("name") if parent else None
-    materialize_candidate_bundle(
-        item,
-        parent_name=parent_name,
-        evaluations=item.get("evaluations", []),
-        analysis={
-            "status": item.get("status"),
-            "archived": item.get("archived"),
-            "failure_rate": item.get("failure_rate"),
-            "metadata": item.get("metadata", {}),
-        },
-    )
     item["artifacts"] = load_candidate_bundle(item)
     return JSONResponse(item)
 
@@ -231,7 +216,8 @@ async def api_events(after_id: int = 0, limit: int = 100) -> JSONResponse:
 @app.get("/api/events/stream")
 async def api_events_stream() -> StreamingResponse:
     async def event_gen() -> AsyncGenerator[str, None]:
-        last_id = 0
+        existing = store.list_events(limit=1)
+        last_id = int(existing[0]["id"]) if existing else 0
         while True:
             events = store.list_events(after_id=last_id, limit=100)
             if events:
@@ -261,3 +247,10 @@ async def api_step() -> JSONResponse:
 @app.post("/api/loop/reset")
 async def api_reset() -> JSONResponse:
     return JSONResponse(await loop_service.reset())
+
+
+@app.post("/api/backup")
+async def api_backup(payload: dict = Body(default={})) -> JSONResponse:
+    reason = payload.get("reason") if isinstance(payload, dict) else None
+    backup = store.create_backup_snapshot(reason=reason or "manual")
+    return JSONResponse({"ok": True, "backup": backup})

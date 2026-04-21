@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 import shutil
 from typing import Any, Iterator
@@ -11,6 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "data" / "loop.db"
 SECRETS_PATH = BASE_DIR / "data" / "secrets.json"
 CANDIDATE_ROOT = BASE_DIR / "data" / "candidates"
+BACKUP_ROOT = BASE_DIR / "data" / "backups"
 
 DEFAULT_SETTINGS = {
     "agent_a_model": "gpt-5.4",
@@ -192,6 +194,51 @@ def set_loop_state(*, status: str, iteration: int | None = None, note: str | Non
             )
 
 
+def create_backup_snapshot(reason: str = "manual") -> dict[str, Any] | None:
+    overview = get_overview()
+    candidate_count = int(overview["stats"].get("total_candidates", 0))
+    evaluation_count = int(overview["stats"].get("total_evaluations", 0))
+    with get_conn() as conn:
+        event_count = int(conn.execute("SELECT COUNT(*) FROM events").fetchone()[0])
+    has_candidate_files = CANDIDATE_ROOT.exists() and any(CANDIDATE_ROOT.iterdir())
+    has_db = DB_PATH.exists() and DB_PATH.stat().st_size > 0
+    if not any([candidate_count, evaluation_count, event_count, has_candidate_files, has_db]):
+        return None
+
+    BACKUP_ROOT.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    safe_reason = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "-" for ch in reason).strip("-") or "manual"
+    backup_dir = BACKUP_ROOT / f"{timestamp}-{safe_reason}"
+    backup_dir.mkdir(parents=True, exist_ok=False)
+
+    if DB_PATH.exists():
+        shutil.copy2(DB_PATH, backup_dir / "loop.db")
+    if CANDIDATE_ROOT.exists() and any(CANDIDATE_ROOT.iterdir()):
+        shutil.copytree(CANDIDATE_ROOT, backup_dir / "candidates")
+
+    manifest = {
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "reason": reason,
+        "stats": overview["stats"],
+        "hardest": overview.get("hardest"),
+        "settings": overview.get("settings"),
+        "providers": overview.get("providers"),
+        "includes": {
+            "loop_db": (backup_dir / "loop.db").exists(),
+            "candidates_dir": (backup_dir / "candidates").exists(),
+            "secrets": False,
+        },
+        "event_count": event_count,
+    }
+    (backup_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    return {
+        "path": str(backup_dir),
+        "stats": overview["stats"],
+        "event_count": event_count,
+        "manifest": manifest,
+    }
+
+
 def get_loop_state() -> dict[str, Any]:
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM loop_state WHERE id = 1").fetchone()
@@ -203,7 +250,8 @@ def get_settings() -> dict[str, Any]:
         rows = conn.execute("SELECT key, value_json FROM settings").fetchall()
         out = dict(DEFAULT_SETTINGS)
         for row in rows:
-            out[row["key"]] = json.loads(row["value_json"])
+            if row["key"] in DEFAULT_SETTINGS:
+                out[row["key"]] = json.loads(row["value_json"])
         return out
 
 
@@ -465,7 +513,8 @@ def get_candidate(candidate_id: str) -> dict[str, Any] | None:
         return item
 
 
-def reset_all() -> None:
+def reset_all() -> dict[str, Any] | None:
+    backup = create_backup_snapshot("reset")
     with get_conn() as conn:
         conn.execute("DELETE FROM evaluations")
         conn.execute("DELETE FROM candidates")
@@ -476,3 +525,4 @@ def reset_all() -> None:
     if CANDIDATE_ROOT.exists():
         shutil.rmtree(CANDIDATE_ROOT)
     CANDIDATE_ROOT.mkdir(parents=True, exist_ok=True)
+    return backup

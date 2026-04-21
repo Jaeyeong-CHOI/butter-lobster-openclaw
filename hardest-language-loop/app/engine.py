@@ -131,7 +131,9 @@ class LoopConfig:
 class AgentLoopService:
     def __init__(self) -> None:
         self._task: asyncio.Task[Any] | None = None
+        self._step_task: asyncio.Task[Any] | None = None
         self._running = False
+        self._iteration_lock = asyncio.Lock()
         self.config = LoopConfig()
 
     def bootstrap(self) -> None:
@@ -162,17 +164,33 @@ class AgentLoopService:
         return {"ok": True, "status": "paused"}
 
     async def step_once(self) -> dict[str, Any]:
-        await self._run_iteration(manual=True)
-        return {"ok": True, "status": "stepped"}
+        if self._running:
+            return {"ok": False, "status": "busy", "detail": "Loop is already running"}
+        if self._step_task and not self._step_task.done():
+            return {"ok": False, "status": "busy", "detail": "A manual step is already in progress"}
+        store.set_loop_state(status="running", note="Manual step queued")
+
+        async def _manual_step_wrapper() -> None:
+            try:
+                await self._run_iteration(manual=True)
+            finally:
+                if not self._running:
+                    store.set_loop_state(status="idle", note="Manual step completed")
+
+        self._step_task = asyncio.create_task(_manual_step_wrapper())
+        return {"ok": True, "status": "queued"}
 
     async def reset(self) -> dict[str, Any]:
         self._running = False
         if self._task and not self._task.done():
             self._task.cancel()
-        store.reset_all()
+        if self._step_task and not self._step_task.done():
+            self._step_task.cancel()
+        backup = store.reset_all()
         self.bootstrap()
-        store.insert_event("loop_reset", {"message": "Loop state reset"}, now_iso())
-        return {"ok": True, "status": "reset"}
+        payload = {"message": "Loop state reset", "backup": backup}
+        store.insert_event("loop_reset", payload, now_iso())
+        return {"ok": True, "status": "reset", "backup": backup}
 
     async def _run(self) -> None:
         try:
@@ -681,72 +699,73 @@ Interpreter:
         }
 
     async def _run_iteration(self, manual: bool) -> None:
-        state = store.get_loop_state()
-        iteration = int(state.get("iteration", 0)) + 1
-        parent = self._choose_parent()
-        candidate = self._generate_candidate(iteration, parent)
-        materialize_candidate_bundle(candidate, parent_name=parent.get("name") if parent else None, evaluations=[], analysis={"stage": "generated"})
-        store.insert_candidate(candidate)
-        store.update_candidate_outcome(
-            candidate["id"],
-            failure_rate=0.0,
-            archived=False,
-            status="evaluating",
-            metadata={**candidate["metadata"], "progress": {"completed": 0, "total": 0}},
-        )
-        store.set_loop_state(
-            status="running" if self._running else "idle",
-            iteration=iteration,
-            note=f"Iteration {iteration} generated {candidate['name']}",
-        )
-        store.insert_event(
-            "candidate_generated",
-            {
-                "iteration": iteration,
-                "candidate_id": candidate["id"],
-                "name": candidate["name"],
-                "strategy_family": candidate["metadata"].get("strategy_family"),
-                "strategy_leaf": candidate["metadata"].get("strategy_leaf"),
-                "parent": parent.get("name") if parent else None,
-                "manual": manual,
-            },
-            now_iso(),
-        )
-
-        evaluations = await self._evaluate_candidate(candidate, iteration)
-        analysis = self._analyze(candidate, evaluations)
-        materialize_candidate_bundle(
-            candidate,
-            parent_name=parent.get("name") if parent else None,
-            evaluations=evaluations,
-            analysis=analysis,
-        )
-        store.update_candidate_outcome(
-            candidate["id"],
-            failure_rate=analysis["failure_rate"],
-            archived=analysis["archived"],
-            status=analysis["status"],
-            metadata=analysis["metadata"],
-        )
-        store.insert_event(
-            "benchmark_completed",
-            {
-                "iteration": iteration,
-                "candidate_id": candidate["id"],
-                "failure_rate": analysis["failure_rate"],
-                "archived": analysis["archived"],
-                "hardest_models": analysis["metadata"].get("hardest_models", []),
-                "total_evals": analysis["metadata"].get("total_evals", 0),
-            },
-            now_iso(),
-        )
-        if analysis["archived"]:
+        async with self._iteration_lock:
+            state = store.get_loop_state()
+            iteration = int(state.get("iteration", 0)) + 1
+            parent = self._choose_parent()
+            candidate = self._generate_candidate(iteration, parent)
+            materialize_candidate_bundle(candidate, parent_name=parent.get("name") if parent else None, evaluations=[], analysis={"stage": "generated"})
+            store.insert_candidate(candidate)
+            store.update_candidate_outcome(
+                candidate["id"],
+                failure_rate=0.0,
+                archived=False,
+                status="evaluating",
+                metadata={**candidate["metadata"], "progress": {"completed": 0, "total": 0}},
+            )
+            store.set_loop_state(
+                status="running" if self._running or manual else "idle",
+                iteration=iteration,
+                note=f"Iteration {iteration} generated {candidate['name']}",
+            )
             store.insert_event(
-                "archive_updated",
+                "candidate_generated",
                 {
                     "iteration": iteration,
                     "candidate_id": candidate["id"],
-                    "message": f"{candidate['name']} entered the hardest-language archive",
+                    "name": candidate["name"],
+                    "strategy_family": candidate["metadata"].get("strategy_family"),
+                    "strategy_leaf": candidate["metadata"].get("strategy_leaf"),
+                    "parent": parent.get("name") if parent else None,
+                    "manual": manual,
                 },
                 now_iso(),
             )
+
+            evaluations = await self._evaluate_candidate(candidate, iteration)
+            analysis = self._analyze(candidate, evaluations)
+            materialize_candidate_bundle(
+                candidate,
+                parent_name=parent.get("name") if parent else None,
+                evaluations=evaluations,
+                analysis=analysis,
+            )
+            store.update_candidate_outcome(
+                candidate["id"],
+                failure_rate=analysis["failure_rate"],
+                archived=analysis["archived"],
+                status=analysis["status"],
+                metadata=analysis["metadata"],
+            )
+            store.insert_event(
+                "benchmark_completed",
+                {
+                    "iteration": iteration,
+                    "candidate_id": candidate["id"],
+                    "failure_rate": analysis["failure_rate"],
+                    "archived": analysis["archived"],
+                    "hardest_models": analysis["metadata"].get("hardest_models", []),
+                    "total_evals": analysis["metadata"].get("total_evals", 0),
+                },
+                now_iso(),
+            )
+            if analysis["archived"]:
+                store.insert_event(
+                    "archive_updated",
+                    {
+                        "iteration": iteration,
+                        "candidate_id": candidate["id"],
+                        "message": f"{candidate['name']} entered the hardest-language archive",
+                    },
+                    now_iso(),
+                )
