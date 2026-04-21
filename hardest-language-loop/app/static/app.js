@@ -31,6 +31,10 @@ const closeSettingsBtn = document.getElementById('closeSettingsBtn');
 const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 const settingsModal = document.getElementById('settingsModal');
 const settingsBackdrop = document.getElementById('settingsBackdrop');
+const startBtn = document.getElementById('startBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const stepBtn = document.getElementById('stepBtn');
+const resetBtn = document.getElementById('resetBtn');
 
 const agentControls = {
   agent_a: {
@@ -270,6 +274,23 @@ function configHintText(agents) {
   return `A: ${agents.agent_a.model} / ${thinkingLabel(agents.agent_a.thinking)} / ${agents.agent_a.temperature} · B: ${agents.agent_b.model} / ${thinkingLabel(agents.agent_b.thinking)} / ${agents.agent_b.temperature}`;
 }
 
+function setActionState(button, { disabled = false, active = false } = {}) {
+  button.disabled = disabled;
+  button.classList.toggle('is-active', active);
+}
+
+function renderActionButtons(loopState = {}) {
+  const status = loopState.status || 'idle';
+  const running = status === 'running';
+  const paused = status === 'paused';
+
+  setActionState(openSettingsBtn, { disabled: false, active: false });
+  setActionState(startBtn, { disabled: running, active: running });
+  setActionState(pauseBtn, { disabled: !running, active: paused });
+  setActionState(stepBtn, { disabled: running, active: false });
+  setActionState(resetBtn, { disabled: false, active: false });
+}
+
 function populateConfigControls(config) {
   if (!config) return;
   const models = config.openai_models || [];
@@ -373,6 +394,7 @@ async function refreshOverview() {
     metricCard('현재 hardest', hardest.name || '—', hardest.failure_rate != null ? `failure ${percent(hardest.failure_rate)}` : '아직 없음'),
   ].join('');
 
+  renderActionButtons(loopState);
   renderBenchmark();
 }
 
@@ -873,10 +895,10 @@ Object.entries(agentControls).forEach(([agentKey, controls]) => {
   });
 });
 
-document.getElementById('startBtn').addEventListener('click', () => post('/api/loop/start'));
-document.getElementById('pauseBtn').addEventListener('click', () => post('/api/loop/pause'));
-document.getElementById('stepBtn').addEventListener('click', () => post('/api/loop/step'));
-document.getElementById('resetBtn').addEventListener('click', async () => {
+startBtn.addEventListener('click', () => post('/api/loop/start'));
+pauseBtn.addEventListener('click', () => post('/api/loop/pause'));
+stepBtn.addEventListener('click', () => post('/api/loop/step'));
+resetBtn.addEventListener('click', async () => {
   await post('/api/loop/reset');
   clearSelection();
   renderCandidateList();
@@ -899,6 +921,7 @@ function connectEvents() {
 
 async function init() {
   inspectorContent.innerHTML = emptyInspectorHtml();
+  renderActionButtons({ status: 'idle' });
   renderFocusCard();
   strategyTreeStage.innerHTML = panelEmpty('전략 트리가 비어 있음', '후보를 선택하면 여기에 전략 탐색 구조가 나타난다.');
   graphStage.innerHTML = panelEmpty('실행 그래프가 비어 있음', '후보를 선택하면 Agent A → Agent B → Validator 흐름이 나타난다.');
