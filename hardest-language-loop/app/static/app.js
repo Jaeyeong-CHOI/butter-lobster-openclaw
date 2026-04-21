@@ -179,6 +179,8 @@ function renderEvalTable(evals) {
 
 function renderOverviewTab(c) {
   const meta = c.metadata || {};
+  const graph = JSON.parse(c.artifacts?.files?.['agent_graph.json'] || '{"nodes":[],"edges":[]}');
+  const tree = JSON.parse(c.artifacts?.files?.['strategy_tree.json'] || '{"selected_path":[]}');
   return `
     <div class="workspace-section">
       <div class="overview-grid">
@@ -198,11 +200,100 @@ function renderOverviewTab(c) {
           <h3>Runtime Settings</h3>
           <p>Agent 2 model: ${meta.agent2_model || 'gpt-5.4'}<br>Submission: JSON AST<br>Validator: deterministic execution</p>
         </div>
+        <div class="detail-box">
+          <h3>Node Graph</h3>
+          <p>${graph.nodes?.length || 0} nodes · ${(graph.edges || []).length} edges</p>
+        </div>
+        <div class="detail-box">
+          <h3>Selected Strategy Path</h3>
+          <p>${(tree.selected_path || []).join(' → ') || 'not available'}</p>
+        </div>
       </div>
       <div class="detail-box">
         <h3>Metadata</h3>
         <pre class="code-block compact">${escapeHtml(JSON.stringify(meta, null, 2))}</pre>
       </div>
+    </div>
+  `;
+}
+
+function graphNodeClass(kind, status) {
+  return `graph-node ${kind || 'artifact'} ${status || ''}`;
+}
+
+function renderGraphTab(c) {
+  const graph = JSON.parse(c.artifacts?.files?.['agent_graph.json'] || '{"nodes":[],"edges":[]}');
+  const width = 1420;
+  const height = 360;
+  const nodeIndex = Object.fromEntries((graph.nodes || []).map((n) => [n.id, n]));
+  const edgeSvg = (graph.edges || []).map(([src, dst]) => {
+    const a = nodeIndex[src];
+    const b = nodeIndex[dst];
+    if (!a || !b) return '';
+    return `<line x1="${a.x + 70}" y1="${a.y + 28}" x2="${b.x + 70}" y2="${b.y + 28}" class="graph-edge" marker-end="url(#arrow)" />`;
+  }).join('');
+  const nodeSvg = (graph.nodes || []).map((n) => `
+    <g transform="translate(${n.x},${n.y})">
+      <rect rx="14" ry="14" width="140" height="56" class="${graphNodeClass(n.kind, n.status)}"></rect>
+      <text x="70" y="24" text-anchor="middle" class="graph-label">${String(n.label).split('\n').map((line, idx) => `<tspan x="70" dy="${idx===0?0:16}">${escapeHtml(line)}</tspan>`).join('')}</text>
+    </g>
+  `).join('');
+  return `
+    <div class="workspace-section">
+      <div class="detail-box">
+        <h3>Agent / Artifact Graph</h3>
+        <p>Visualizes the current loop as nodes: strategy root → Agent A → interpreter/schema/tasks → Agent B → JSON program → validator → result.</p>
+      </div>
+      <div class="graph-stage">
+        <svg viewBox="0 0 ${width} ${height}" class="graph-svg" role="img" aria-label="Agent graph">
+          <defs>
+            <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+              <path d="M0,0 L0,6 L9,3 z" class="graph-arrow"></path>
+            </marker>
+          </defs>
+          ${edgeSvg}
+          ${nodeSvg}
+        </svg>
+      </div>
+      <div class="artifact-card"><h3>agent_graph.json</h3><pre class="code-block compact">${escapeHtml(c.artifacts?.files?.['agent_graph.json'] || '')}</pre></div>
+    </div>
+  `;
+}
+
+function renderTreeNode(nodeId, tree, depth = 0) {
+  const node = tree.nodes?.[nodeId];
+  if (!node) return '';
+  const children = (tree.edges || [])
+    .filter(([src]) => src === nodeId)
+    .map(([, dst]) => dst);
+  return `
+    <li>
+      <div class="tree-node ${node.kind || ''} ${node.status || ''}">
+        <div class="tree-title">${escapeHtml(node.label || nodeId)}</div>
+        <div class="tree-meta">${node.kind || ''}${node.score != null ? ` · score ${node.score}` : ''}${node.note ? ` · ${escapeHtml(node.note)}` : ''}</div>
+      </div>
+      ${children.length ? `<ul>${children.map((child) => renderTreeNode(child, tree, depth + 1)).join('')}</ul>` : ''}
+    </li>
+  `;
+}
+
+function renderStrategyTab(c) {
+  const tree = JSON.parse(c.artifacts?.files?.['strategy_tree.json'] || '{"nodes":{},"edges":[],"selected_path":[]}');
+  return `
+    <div class="workspace-section">
+      <div class="detail-box">
+        <h3>Strategy Tree Search</h3>
+        <p>Agent A explores strategy families as a tree. The selected path represents the currently materialized interpreter candidate.</p>
+        <div class="pills">${(tree.selected_path || []).map((x) => pill(x)).join('')}</div>
+      </div>
+      <div class="tree-stage">
+        <div class="tree-root">
+          <ul class="tree-list">
+            ${renderTreeNode('root', tree)}
+          </ul>
+        </div>
+      </div>
+      <div class="artifact-card"><h3>strategy_tree.json</h3><pre class="code-block compact">${escapeHtml(c.artifacts?.files?.['strategy_tree.json'] || '')}</pre></div>
     </div>
   `;
 }
@@ -281,6 +372,8 @@ function renderRawTab(c) {
 
 function renderWorkspaceTab(c) {
   switch (state.activeTab) {
+    case 'graph': return renderGraphTab(c);
+    case 'strategy': return renderStrategyTab(c);
     case 'agentA': return renderAgentATab(c);
     case 'agentB': return renderAgentBTab(c);
     case 'validator': return renderValidatorTab(c);

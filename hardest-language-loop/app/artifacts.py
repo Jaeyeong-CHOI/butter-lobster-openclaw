@@ -50,6 +50,157 @@ def _task_bank(candidate: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def _strategy_tree(candidate: dict[str, Any], parent_name: str | None) -> dict[str, Any]:
+    level = candidate.get("level", "L3")
+    selected_family = {
+        "Seed": "baseline_python_near",
+        "L1": "token_conflict",
+        "L2": "syntax_conflict",
+        "L3": "semantic_conflict",
+        "L4": "implicit_semantic_conflict",
+        "L5": "compound_conflict",
+    }.get(level, "semantic_conflict")
+    selected_leaf = {
+        "Seed": "baseline_reference",
+        "L1": "cross_keyword_swap",
+        "L2": "block_syntax_inversion",
+        "L3": "inverted_if",
+        "L4": "example_only_rule_induction",
+        "L5": "keyword_plus_syntax_plus_semantics",
+    }.get(level, "inverted_if")
+
+    def fam_status(fam_id: str) -> str:
+        return "selected" if fam_id == selected_family else "explored"
+
+    def leaf_status(leaf_id: str) -> str:
+        return "selected" if leaf_id == selected_leaf else "candidate"
+
+    return {
+        "candidate_id": candidate["id"],
+        "tree_name": f"Strategy search for {candidate['name']}",
+        "selected_path": ["root", selected_family, selected_leaf],
+        "nodes": {
+            "root": {
+                "label": "Python-near hardest-language search",
+                "kind": "root",
+                "status": "active",
+                "note": f"Parent = {parent_name or candidate.get('parent_id') or 'None'}",
+            },
+            "baseline_python_near": {
+                "label": "Baseline / Python-near",
+                "kind": "family",
+                "status": fam_status("baseline_python_near"),
+            },
+            "token_conflict": {
+                "label": "Token conflict family",
+                "kind": "family",
+                "status": fam_status("token_conflict"),
+            },
+            "syntax_conflict": {
+                "label": "Syntax conflict family",
+                "kind": "family",
+                "status": fam_status("syntax_conflict"),
+            },
+            "semantic_conflict": {
+                "label": "Explicit semantic conflict family",
+                "kind": "family",
+                "status": fam_status("semantic_conflict"),
+            },
+            "implicit_semantic_conflict": {
+                "label": "Implicit semantic conflict family",
+                "kind": "family",
+                "status": fam_status("implicit_semantic_conflict"),
+            },
+            "compound_conflict": {
+                "label": "Compound conflict family",
+                "kind": "family",
+                "status": fam_status("compound_conflict"),
+            },
+            "baseline_reference": {
+                "label": "Reference interpreter",
+                "kind": "strategy",
+                "status": leaf_status("baseline_reference"),
+                "score": round(candidate.get("similarity_score", 0.0), 3),
+            },
+            "cross_keyword_swap": {
+                "label": "Cross-keyword swap",
+                "kind": "strategy",
+                "status": leaf_status("cross_keyword_swap"),
+                "score": round(candidate.get("conflict_score", 0.0), 3),
+            },
+            "block_syntax_inversion": {
+                "label": "Block syntax inversion",
+                "kind": "strategy",
+                "status": leaf_status("block_syntax_inversion"),
+                "score": round(candidate.get("conflict_score", 0.0), 3),
+            },
+            "inverted_if": {
+                "label": "Invert IF semantics",
+                "kind": "strategy",
+                "status": leaf_status("inverted_if"),
+                "score": round(candidate.get("failure_rate", 0.0), 3),
+            },
+            "example_only_rule_induction": {
+                "label": "Example-only rule induction",
+                "kind": "strategy",
+                "status": leaf_status("example_only_rule_induction"),
+                "score": round(candidate.get("failure_rate", 0.0), 3),
+            },
+            "keyword_plus_syntax_plus_semantics": {
+                "label": "Keyword + syntax + semantics bundle",
+                "kind": "strategy",
+                "status": leaf_status("keyword_plus_syntax_plus_semantics"),
+                "score": round(candidate.get("failure_rate", 0.0), 3),
+            },
+        },
+        "edges": [
+            ["root", "baseline_python_near"],
+            ["root", "token_conflict"],
+            ["root", "syntax_conflict"],
+            ["root", "semantic_conflict"],
+            ["root", "implicit_semantic_conflict"],
+            ["root", "compound_conflict"],
+            ["baseline_python_near", "baseline_reference"],
+            ["token_conflict", "cross_keyword_swap"],
+            ["syntax_conflict", "block_syntax_inversion"],
+            ["semantic_conflict", "inverted_if"],
+            ["implicit_semantic_conflict", "example_only_rule_induction"],
+            ["compound_conflict", "keyword_plus_syntax_plus_semantics"],
+        ],
+    }
+
+
+def _agent_graph(candidate: dict[str, Any]) -> dict[str, Any]:
+    archived = bool(candidate.get("archived"))
+    return {
+        "candidate_id": candidate["id"],
+        "nodes": [
+            {"id": "strategy_root", "label": "Strategy Root", "kind": "strategy", "x": 70, "y": 110, "status": "active"},
+            {"id": "agent_a", "label": "Agent A\nInterpreter Builder", "kind": "agent", "x": 260, "y": 110, "status": "active"},
+            {"id": "interpreter", "label": "interpreter.ml", "kind": "artifact", "x": 470, "y": 50, "status": "ready"},
+            {"id": "schema", "label": "ast_schema.json", "kind": "artifact", "x": 470, "y": 170, "status": "ready"},
+            {"id": "tasks", "label": "tasks.json", "kind": "artifact", "x": 470, "y": 290, "status": "ready"},
+            {"id": "agent_b", "label": "Agent B\nProgram Solver", "kind": "agent", "x": 700, "y": 110, "status": "active"},
+            {"id": "program", "label": "program_attempts.json", "kind": "artifact", "x": 900, "y": 110, "status": "ready"},
+            {"id": "validator", "label": "Validator\nJSON → AST → Execute", "kind": "agent", "x": 1110, "y": 110, "status": "active"},
+            {"id": "result", "label": "validator_result.json", "kind": "artifact", "x": 1330, "y": 110, "status": "archived" if archived else "scored"},
+        ],
+        "edges": [
+            ["strategy_root", "agent_a"],
+            ["agent_a", "interpreter"],
+            ["agent_a", "schema"],
+            ["agent_a", "tasks"],
+            ["interpreter", "agent_b"],
+            ["schema", "agent_b"],
+            ["tasks", "agent_b"],
+            ["agent_b", "program"],
+            ["program", "validator"],
+            ["interpreter", "validator"],
+            ["validator", "result"],
+        ],
+    }
+
+
 def _language_spec(candidate: dict[str, Any], parent_name: str | None) -> dict[str, Any]:
     meta = candidate.get("metadata", {}) or {}
     level = candidate.get("level", "L3")
@@ -103,9 +254,10 @@ def _spec_markdown(candidate: dict[str, Any], parent_name: str | None) -> str:
 {candidate['interpreter_hint']}
 
 ## Pipeline
-1. Agent A mutates or creates the interpreter.
-2. Agent B generates a JSON AST program for the task.
-3. The deterministic validator parses JSON, reconstructs AST, executes the interpreter, and compares outputs.
+1. Strategy tree selects a mutation family and strategy branch.
+2. Agent A mutates or creates the interpreter.
+3. Agent B generates a JSON AST program for the task.
+4. The deterministic validator parses JSON, reconstructs AST, executes the interpreter, and compares outputs.
 
 ## Structured Spec
 ```json
@@ -282,6 +434,8 @@ def materialize_candidate_bundle(
     ast_schema = _ast_schema(candidate)
     program_attempts = _program_attempts(candidate, evaluations)
     validator_result = _validator_result(candidate, evaluations, analysis)
+    strategy_tree = _strategy_tree(candidate, parent_name)
+    agent_graph = _agent_graph(candidate)
 
     files: dict[str, str] = {
         "spec.md": _spec_markdown(candidate, parent_name),
@@ -289,6 +443,8 @@ def materialize_candidate_bundle(
         "language_spec.json": json.dumps(language_spec, ensure_ascii=False, indent=2),
         "ast_schema.json": json.dumps(ast_schema, ensure_ascii=False, indent=2),
         "tasks.json": json.dumps(_task_bank(candidate), ensure_ascii=False, indent=2),
+        "strategy_tree.json": json.dumps(strategy_tree, ensure_ascii=False, indent=2),
+        "agent_graph.json": json.dumps(agent_graph, ensure_ascii=False, indent=2),
         "program_attempts.json": json.dumps(program_attempts, ensure_ascii=False, indent=2),
         "validator_result.json": json.dumps(validator_result, ensure_ascii=False, indent=2),
         "candidate.json": json.dumps(candidate, ensure_ascii=False, indent=2),
