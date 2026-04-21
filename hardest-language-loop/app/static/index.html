@@ -8,85 +8,94 @@
   </head>
   <body>
     <header class="topbar">
-      <div>
+      <div class="brand">
         <h1>Hardest Language Loop</h1>
-        <p class="subtitle">Monitor the full executable pipeline: Agent A builds the interpreter, Agent B emits JSON AST programs, and the validator executes them deterministically.</p>
+        <p class="subtitle">Graph-first interface for strategy search, agent coordination, and executable validation.</p>
       </div>
-      <div class="controls">
-        <label class="select-wrap">
+      <div class="header-controls">
+        <label class="control-block">
           <span>Agent 2 Model</span>
           <select id="agent2ModelSelect"></select>
         </label>
-        <label class="select-wrap key-wrap">
+        <label class="control-block key-block">
           <span>OpenAI API Key</span>
-          <div class="key-controls">
+          <div class="key-row">
             <input id="openaiKeyInput" type="password" placeholder="sk-..." />
-            <button id="saveKeyBtn" class="secondary">Save Key</button>
+            <button id="saveKeyBtn" class="secondary">Save</button>
             <button id="clearKeyBtn" class="secondary">Clear</button>
           </div>
         </label>
-        <span id="configHint" class="hint">Applies to new iterations</span>
-        <button id="startBtn">Start Loop</button>
-        <button id="pauseBtn" class="secondary">Pause</button>
-        <button id="stepBtn" class="secondary">Single Step</button>
-        <button id="resetBtn" class="danger">Reset</button>
+        <div class="run-controls">
+          <button id="startBtn">Start</button>
+          <button id="pauseBtn" class="secondary">Pause</button>
+          <button id="stepBtn" class="secondary">Step</button>
+          <button id="resetBtn" class="danger">Reset</button>
+        </div>
       </div>
     </header>
 
-    <main class="grid">
-      <section class="panel metrics">
-        <div class="panel-head">
-          <h2>Loop Overview</h2>
-          <span class="hint">System-level summary</span>
-        </div>
-        <div class="metric-grid" id="metricGrid"></div>
+    <section class="summary-bar" id="summaryBar"></section>
+
+    <main class="layout">
+      <aside class="sidebar left">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Candidates</h2>
+            <span id="configHint" class="muted">loading…</span>
+          </div>
+          <div class="filters">
+            <input id="searchInput" class="search" placeholder="Search by level, strategy, mutation…" />
+            <label class="checkbox"><input type="checkbox" id="archivedOnly" /> archived only</label>
+          </div>
+          <div id="candidateList" class="candidate-list"></div>
+        </section>
+      </aside>
+
+      <section class="center-stage">
+        <section class="panel graph-panel">
+          <div class="panel-head">
+            <h2>Strategy Tree</h2>
+            <span class="muted">click a node to filter candidates</span>
+          </div>
+          <div id="strategyTreeStage" class="tree-stage"></div>
+        </section>
+
+        <section class="panel graph-panel large">
+          <div class="panel-head">
+            <h2>Agent Exchange Graph</h2>
+            <span class="muted">click nodes for prompts/files · click edges for exchanged information</span>
+          </div>
+          <div id="graphStage" class="graph-stage"></div>
+        </section>
+
+        <section class="panel graph-panel benchmark-panel">
+          <div class="panel-head">
+            <h2>Benchmark Snapshot</h2>
+            <span class="muted">live execution summary</span>
+          </div>
+          <div id="benchmarkContent" class="benchmark-grid"></div>
+        </section>
       </section>
 
-      <section class="panel explorer-panel">
-        <div class="panel-head">
-          <h2>Candidate Explorer</h2>
-          <span class="hint">Search / filter / inspect</span>
-        </div>
-        <div class="toolbar">
-          <input id="searchInput" class="search" placeholder="Search candidates, level, mutation…" />
-          <label class="checkbox"><input type="checkbox" id="archivedOnly" /> archived only</label>
-        </div>
-        <div id="candidateList" class="candidate-list"></div>
-      </section>
+      <aside class="sidebar right">
+        <section class="panel inspector-panel">
+          <div class="panel-head">
+            <h2>Inspector</h2>
+            <span id="selectedHint" class="muted">Select a candidate</span>
+          </div>
+          <div id="inspectorContent" class="inspector empty">
+            Click a candidate, graph node, or graph edge to inspect details.
+          </div>
+        </section>
 
-      <section class="panel workspace-panel">
-        <div class="panel-head">
-          <h2>Execution Workspace</h2>
-          <span id="selectedHint" class="hint">Select a candidate</span>
-        </div>
-        <div class="tabs">
-          <button class="tab active" data-tab="overview">Pipeline Overview</button>
-          <button class="tab" data-tab="graph">Agent Graph</button>
-          <button class="tab" data-tab="strategy">Strategy Tree</button>
-          <button class="tab" data-tab="agentA">Agent A / Interpreter</button>
-          <button class="tab" data-tab="agentB">Agent B / Program JSON</button>
-          <button class="tab" data-tab="validator">Validator</button>
-          <button class="tab" data-tab="data">Data Bundle</button>
-          <button class="tab" data-tab="raw">Raw JSON</button>
-        </div>
-        <div id="workspaceContent" class="workspace empty">Select a candidate to inspect interpreter, schema, program JSON, and validator outputs.</div>
-      </section>
-
-      <section class="panel benchmark-panel">
-        <div class="panel-head">
-          <h2>Benchmark Monitor</h2>
-          <span class="hint">Execution outcomes by model, task, and level</span>
-        </div>
-        <div id="benchmarkContent" class="benchmark-grid"></div>
-      </section>
-
-      <section class="panel log-panel">
-        <div class="panel-head">
-          <h2>Live Event Stream</h2>
-          <span id="eventStatus" class="badge">connecting…</span>
-        </div>
-        <div id="eventList" class="event-list"></div>
-      </section>
+        <section class="panel event-panel">
+          <div class="panel-head">
+            <h2>Event Stream</h2>
+            <span id="eventStatus" class="badge">connecting…</span>
+          </div>
+          <div id="eventList" class="event-list"></div>
+        </section>
+      </aside>
     </main>
 
     <script src="/static/app.js"></script>

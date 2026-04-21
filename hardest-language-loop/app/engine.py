@@ -87,16 +87,14 @@ class AgentLoopService:
     def bootstrap(self) -> None:
         total = store.get_overview()["stats"]["total_candidates"]
         if total == 0:
-            for seed in SEEDS:
-                candidate = {
-                    **seed,
-                    "id": f"seed-{uuid.uuid4().hex[:8]}",
-                    "parent_id": None,
-                    "created_at": now_iso(),
-                }
-                materialize_candidate_bundle(candidate, parent_name=None, evaluations=[], analysis={"bootstrap": True})
-                store.insert_candidate(candidate)
-            store.insert_event("bootstrap", {"message": "Seed languages inserted"}, now_iso())
+            store.insert_event(
+                "bootstrap",
+                {
+                    "message": "Empty-state bootstrap complete",
+                    "note": "No mock candidates were inserted. Generate or import real candidates.",
+                },
+                now_iso(),
+            )
 
     async def start(self) -> dict[str, Any]:
         if self._running:
