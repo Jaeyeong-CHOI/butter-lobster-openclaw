@@ -117,7 +117,8 @@ function filteredCandidates() {
   return state.candidates.filter((c) => {
     if (state.archivedOnly && !c.archived) return false;
     if (!q) return true;
-    const hay = `${c.name} ${c.level} ${c.mutation_summary}`.toLowerCase();
+    const meta = c.metadata || {};
+    const hay = `${c.name} ${c.level} ${c.mutation_summary} ${meta.strategy_family || ''} ${meta.strategy_leaf || ''}`.toLowerCase();
     return hay.includes(q);
   });
 }
@@ -232,8 +233,18 @@ function renderGraphTab(c) {
     if (!a || !b) return '';
     return `<line x1="${a.x + 70}" y1="${a.y + 28}" x2="${b.x + 70}" y2="${b.y + 28}" class="graph-edge" marker-end="url(#arrow)" />`;
   }).join('');
+  const targetTab = (nodeId) => ({
+    'agent_a': 'agentA',
+    'agent_b': 'agentB',
+    'validator': 'validator',
+    'interpreter': 'agentA',
+    'schema': 'agentA',
+    'tasks': 'agentB',
+    'program': 'agentB',
+    'result': 'validator',
+  }[nodeId] || 'overview');
   const nodeSvg = (graph.nodes || []).map((n) => `
-    <g transform="translate(${n.x},${n.y})">
+    <g transform="translate(${n.x},${n.y})" class="graph-node-group" data-target-tab="${targetTab(n.id)}" data-node-id="${n.id}">
       <rect rx="14" ry="14" width="140" height="56" class="${graphNodeClass(n.kind, n.status)}"></rect>
       <text x="70" y="24" text-anchor="middle" class="graph-label">${String(n.label).split('\n').map((line, idx) => `<tspan x="70" dy="${idx===0?0:16}">${escapeHtml(line)}</tspan>`).join('')}</text>
     </g>
@@ -266,9 +277,10 @@ function renderTreeNode(nodeId, tree, depth = 0) {
   const children = (tree.edges || [])
     .filter(([src]) => src === nodeId)
     .map(([, dst]) => dst);
+  const filterValue = nodeId === 'root' ? '' : (node.label || nodeId);
   return `
     <li>
-      <div class="tree-node ${node.kind || ''} ${node.status || ''}">
+      <div class="tree-node ${node.kind || ''} ${node.status || ''}" data-strategy-filter="${escapeHtml(filterValue)}" data-node-id="${nodeId}">
         <div class="tree-title">${escapeHtml(node.label || nodeId)}</div>
         <div class="tree-meta">${node.kind || ''}${node.score != null ? ` · score ${node.score}` : ''}${node.note ? ` · ${escapeHtml(node.note)}` : ''}</div>
       </div>
@@ -397,6 +409,31 @@ async function selectCandidate(id) {
   selectedHint.textContent = `${c.name} · ${c.level}`;
   workspaceContent.classList.remove('empty');
   workspaceContent.innerHTML = renderWorkspaceTab(c);
+  bindWorkspaceInteractions(c);
+}
+
+function activateTab(tabName) {
+  state.activeTab = tabName;
+  document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === tabName));
+}
+
+function bindWorkspaceInteractions(c) {
+  workspaceContent.querySelectorAll('[data-target-tab]').forEach((el) => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', async () => {
+      activateTab(el.dataset.targetTab);
+      if (state.selectedId) await selectCandidate(state.selectedId);
+    });
+  });
+  workspaceContent.querySelectorAll('[data-strategy-filter]').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const val = el.dataset.strategyFilter || '';
+      state.search = val;
+      searchInput.value = val;
+      await refreshCandidates();
+      if (state.selectedId) await selectCandidate(state.selectedId);
+    });
+  });
 }
 
 function addEventItem(event) {
@@ -474,9 +511,7 @@ clearKeyBtn.addEventListener('click', async () => {
 
 document.querySelectorAll('.tab').forEach((tab) => {
   tab.addEventListener('click', async () => {
-    document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
-    tab.classList.add('active');
-    state.activeTab = tab.dataset.tab;
+    activateTab(tab.dataset.tab);
     if (state.selectedId) await selectCandidate(state.selectedId);
   });
 });

@@ -50,7 +50,7 @@ SEEDS = [
         "failure_rate": 0.0,
         "archived": False,
         "status": "seed",
-        "metadata": {"source": "seed"},
+        "metadata": {"source": "seed", "strategy_family": "baseline_python_near", "strategy_leaf": "baseline_reference"},
     },
     {
         "name": "L3 InvertedIf Seed",
@@ -64,7 +64,7 @@ SEEDS = [
         "failure_rate": 0.68,
         "archived": True,
         "status": "archived",
-        "metadata": {"source": "seed", "notes": "Initial hardest known family"},
+        "metadata": {"source": "seed", "notes": "Initial hardest known family", "strategy_family": "semantic_conflict", "strategy_leaf": "inverted_if"},
     },
 ]
 
@@ -151,6 +151,22 @@ class AgentLoopService:
         agent2_model = settings.get("agent2_model", "gpt-5.4")
         rnd = random.Random(iteration * 7919)
         level, mutation_summary, interpreter_hint = MUTATIONS[iteration % len(MUTATIONS)]
+        strategy_family = {
+            "Seed": "baseline_python_near",
+            "L1": "token_conflict",
+            "L2": "syntax_conflict",
+            "L3": "semantic_conflict",
+            "L4": "implicit_semantic_conflict",
+            "L5": "compound_conflict",
+        }.get(level, "semantic_conflict")
+        strategy_leaf = {
+            "Seed": "baseline_reference",
+            "L1": "cross_keyword_swap",
+            "L2": "block_syntax_inversion",
+            "L3": "inverted_if",
+            "L4": "example_only_rule_induction",
+            "L5": "keyword_plus_syntax_plus_semantics",
+        }.get(level, "inverted_if")
         parent_similarity = float(parent.get("similarity_score", 0.95)) if parent else 0.95
         similarity = max(0.45, min(0.98, parent_similarity + rnd.uniform(-0.08, 0.03)))
         conflict = max(0.15, min(0.98, (parent.get("conflict_score", 0.2) if parent else 0.2) + rnd.uniform(0.03, 0.15)))
@@ -176,6 +192,8 @@ class AgentLoopService:
                 "agent2_model": agent2_model,
                 "python_near": similarity > 0.72,
                 "task_bank": [t["name"] for t in TASKS],
+                "strategy_family": strategy_family,
+                "strategy_leaf": strategy_leaf,
             },
             "created_at": now_iso(),
         }
