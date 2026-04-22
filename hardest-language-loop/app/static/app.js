@@ -57,6 +57,9 @@ const solverThinkingSelect = document.getElementById('solverThinkingSelect');
 const solverTemperatureInput = document.getElementById('solverTemperatureInput');
 const solverRepeatCountInput = document.getElementById('solverRepeatCountInput');
 const solverParallelismInput = document.getElementById('solverParallelismInput');
+const solverTimeoutInput = document.getElementById('solverTimeoutInput');
+const solverMaxRetriesInput = document.getElementById('solverMaxRetriesInput');
+const solverRetryBackoffInput = document.getElementById('solverRetryBackoffInput');
 
 const artifactGlossary = {
   'spec.md': { title: '후보 언어 개요 문서', summary: '이 후보 언어의 핵심 내용을 사람이 읽기 쉬운 마크다운으로 요약한 문서다.', why: '후보의 방향과 변이 의도를 가장 빠르게 파악할 수 있다.' },
@@ -357,6 +360,8 @@ function openSolverCellModal(modelName, taskName) {
             ${pill(`score ${row.score ?? 0}`)}
             ${pill(`execution ${meta.execution_ok ? 'ok' : 'fail'}`, meta.execution_ok ? 'tone-green' : 'tone-neutral')}
             ${pill(`outputs ${meta.outputs_match ? 'match' : 'mismatch'}`, meta.outputs_match ? 'tone-green' : 'tone-neutral')}
+            ${meta.failure_reason ? pill(`reason ${meta.failure_reason}`, meta.failure_reason === 'success' ? 'tone-green' : 'tone-neutral') : ''}
+            ${meta.retry_count ? pill(`retry ${meta.retry_count}`) : ''}
           </div>
           <div class="detail-split-grid">
             <div>
@@ -376,6 +381,8 @@ function openSolverCellModal(modelName, taskName) {
                 ${kv('Outputs match', meta.outputs_match ? 'yes' : 'no')}
                 ${kv('Thinking', meta.thinking || '—')}
                 ${kv('Temperature', meta.temperature ?? '—')}
+                ${kv('Timeout', meta.request_timeout_seconds ? `${meta.request_timeout_seconds}s` : '—')}
+                ${kv('Retry count', meta.retry_count ?? 0)}
               </div>
               ${cases.length ? `
                 <div class="case-list">
@@ -465,13 +472,13 @@ function settingsPreviewText(config) {
   if (!config) return '설정을 불러오는 중…';
   const agentA = config.agent_a;
   const bench = config.solver_bench;
-  return `A · ${agentA.model} · ${thinkingLabel(agentA.thinking)} · temp ${agentA.temperature}  |  Bench · ${bench.enabled_models.length} models · x${bench.repeat_count} · 최대 동시 ${bench.parallelism}`;
+  return `A · ${agentA.model} · ${thinkingLabel(agentA.thinking)} · temp ${agentA.temperature}  |  Bench · ${bench.enabled_models.length} models · x${bench.repeat_count} · 동시 ${bench.parallelism} · retry ${bench.max_retries}`;
 }
 
 function configHintText(config) {
   if (!config) return '설정 불러오는 중…';
   const bench = config.solver_bench;
-  return `A: ${config.agent_a.model} / ${thinkingLabel(config.agent_a.thinking)} / ${config.agent_a.temperature} · Bench: ${bench.enabled_models.length} models × ${bench.repeat_count}회 · 최대 동시 ${bench.parallelism}개`;
+  return `A: ${config.agent_a.model} / ${thinkingLabel(config.agent_a.thinking)} / ${config.agent_a.temperature} · Bench: ${bench.enabled_models.length} models × ${bench.repeat_count}회 · 최대 동시 ${bench.parallelism}개 · timeout ${bench.request_timeout_seconds}s · retry ${bench.max_retries}`;
 }
 
 function setActionState(button, { disabled = false, active = false } = {}) {
@@ -507,6 +514,9 @@ function populateConfigControls(payload) {
   solverTemperatureInput.value = config.solver_bench.temperature;
   solverRepeatCountInput.value = config.solver_bench.repeat_count;
   solverParallelismInput.value = config.solver_bench.parallelism;
+  solverTimeoutInput.value = config.solver_bench.request_timeout_seconds;
+  solverMaxRetriesInput.value = config.solver_bench.max_retries;
+  solverRetryBackoffInput.value = config.solver_bench.retry_backoff_base_seconds;
 
   const enabled = new Set(config.solver_bench.enabled_models || []);
   solverModelChecklist.innerHTML = models.map((name) => `
@@ -555,6 +565,9 @@ function buildConfigPayload() {
       temperature: Number(solverTemperatureInput.value),
       repeat_count: Number(solverRepeatCountInput.value),
       parallelism: Number(solverParallelismInput.value),
+      request_timeout_seconds: Number(solverTimeoutInput.value),
+      max_retries: Number(solverMaxRetriesInput.value),
+      retry_backoff_base_seconds: Number(solverRetryBackoffInput.value),
     },
   };
   const key = openaiKeyInput.value.trim();
@@ -594,6 +607,9 @@ function normalizedAgentSettingsFromCandidate(meta = {}) {
       temperature: meta.agent_b_temperature ?? 0.2,
       repeat_count: 1,
       parallelism: 1,
+      request_timeout_seconds: 75,
+      max_retries: 3,
+      retry_backoff_base_seconds: 1.5,
       provider: 'openai',
     },
   };
@@ -612,7 +628,7 @@ async function refreshOverview() {
     metricCard('후보 수', data.stats.total_candidates, '생성된 candidate'),
     metricCard('Archive', data.stats.archived_candidates, 'hard-but-valid'),
     metricCard('총 평가 수', data.stats.total_evaluations, '모델 × 문제 × 반복'),
-    metricCard('Solver Bench', config ? `${config.solver_bench.enabled_models.length} models` : '—', config ? `x${config.solver_bench.repeat_count} · 최대 동시 ${config.solver_bench.parallelism}` : '설정 로딩 중'),
+    metricCard('Solver Bench', config ? `${config.solver_bench.enabled_models.length} models` : '—', config ? `x${config.solver_bench.repeat_count} · 동시 ${config.solver_bench.parallelism} · retry ${config.solver_bench.max_retries}` : '설정 로딩 중'),
     metricCard('현재 hardest', hardest.name || '—', hardest.failure_rate != null ? `failure ${percent(hardest.failure_rate)}` : '아직 없음'),
   ].join('');
 
@@ -695,6 +711,9 @@ function renderFocusCard() {
       ${kv('Bench models', settings.solver_bench.enabled_models.length)}
       ${kv('반복 횟수', settings.solver_bench.repeat_count)}
       ${kv('최대 동시 요청', settings.solver_bench.parallelism)}
+      ${kv('Timeout', `${settings.solver_bench.request_timeout_seconds}s`)}
+      ${kv('Max retries', settings.solver_bench.max_retries)}
+      ${kv('Backoff base', `${settings.solver_bench.retry_backoff_base_seconds}s`)}
       ${kv('진행률', progressText)}
     </div>
   `;
@@ -950,13 +969,26 @@ function renderSolverBenchMonitor() {
   const passed = evaluations.filter((row) => row.success).length;
 
   const cellMap = new Map();
+  const failureReasonSummary = { ...(meta.failure_reason_summary || {}) };
   evaluations.forEach((row) => {
     const key = `${row.model_name}::${row.task_name}`;
-    if (!cellMap.has(key)) cellMap.set(key, { success: 0, total: 0 });
+    if (!cellMap.has(key)) cellMap.set(key, { success: 0, total: 0, timeout: 0, rateLimit: 0, empty: 0 });
     const bucket = cellMap.get(key);
     bucket.total += 1;
     if (row.success) bucket.success += 1;
+    const reason = row.metadata?.failure_reason;
+    if (reason === 'request_timeout' || reason === 'validator_timeout') bucket.timeout += 1;
+    if (reason === 'rate_limit') bucket.rateLimit += 1;
+    if (reason === 'empty_response') bucket.empty += 1;
   });
+
+  const failureReasonCards = Object.keys(failureReasonSummary).length
+    ? `
+      <div class="failure-reason-row">
+        ${Object.entries(failureReasonSummary).map(([reason, count]) => `<div class="failure-reason-chip"><strong>${escapeHtml(reason)}</strong><span>${escapeHtml(String(count))}</span></div>`).join('')}
+      </div>
+    `
+    : '<p class="candidate-meta">현재 기록된 실패 사유 집계가 없다.</p>';
 
   const table = `
     <table class="solver-monitor-table">
@@ -977,7 +1009,7 @@ function renderSolverBenchMonitor() {
             modelTotal += bucket.total;
             const tone = bucket.total === 0 ? 'pending' : (bucket.success === bucket.total ? 'full' : (bucket.success > 0 ? 'partial' : 'empty'));
             const clickable = bucket.total > 0 ? 'interactive' : 'disabled';
-            return `<td><button type="button" class="solver-cell ${tone} ${clickable}" ${bucket.total > 0 ? `data-solver-model="${escapeHtml(modelName)}" data-solver-task="${escapeHtml(task)}"` : 'disabled'}><strong>${bucket.success}/${repeatCount}</strong><span>${bucket.total}/${repeatCount} 완료</span></button></td>`;
+            return `<td><button type="button" class="solver-cell ${tone} ${clickable}" ${bucket.total > 0 ? `data-solver-model="${escapeHtml(modelName)}" data-solver-task="${escapeHtml(task)}"` : 'disabled'}><strong>${bucket.success}/${repeatCount}</strong><span>${bucket.total}/${repeatCount} 완료</span><div class="solver-badge-row">${bucket.timeout ? `<span class="solver-badge timeout">timeout ${bucket.timeout}</span>` : ''}${bucket.rateLimit ? `<span class="solver-badge rate">429 ${bucket.rateLimit}</span>` : ''}${bucket.empty ? `<span class="solver-badge empty">empty ${bucket.empty}</span>` : ''}</div></button></td>`;
           }).join('');
           return `
             <tr>
@@ -997,8 +1029,15 @@ function renderSolverBenchMonitor() {
       ${kv('성공 수', `${passed}/${completed || expectedTotal || 0}`)}
       ${kv('반복 횟수', repeatCount)}
       ${kv('최대 동시 요청', settings.parallelism)}
+      ${kv('Timeout', `${settings.request_timeout_seconds}s`)}
+      ${kv('Max retries', settings.max_retries)}
+      ${kv('Backoff', `${settings.retry_backoff_base_seconds}s`)}
       ${kv('Thinking', thinkingLabel(settings.thinking))}
       ${kv('Temperature', settings.temperature)}
+    </div>
+    <div class="detail-section">
+      <h3>실패 사유 집계</h3>
+      ${failureReasonCards}
     </div>
     ${table}
   `;
@@ -1048,10 +1087,14 @@ function showCandidateInspector(detail) {
           ${kv('Enabled models', settings.solver_bench.enabled_models.join(', '))}
           ${kv('Repeat count', settings.solver_bench.repeat_count)}
           ${kv('최대 동시 요청', settings.solver_bench.parallelism)}
+          ${kv('Timeout', `${settings.solver_bench.request_timeout_seconds}s`)}
+          ${kv('Max retries', settings.solver_bench.max_retries)}
+          ${kv('Backoff base', `${settings.solver_bench.retry_backoff_base_seconds}s`)}
           ${kv('Thinking', thinkingLabel(settings.solver_bench.thinking))}
           ${kv('Temperature', settings.solver_bench.temperature)}
         </div>
       `)}
+      ${inspectorCard('실패 사유 집계', Object.keys(meta.failure_reason_summary || {}).length ? `<div class="failure-reason-row">${Object.entries(meta.failure_reason_summary || {}).map(([reason, count]) => `<div class="failure-reason-chip"><strong>${escapeHtml(reason)}</strong><span>${escapeHtml(String(count))}</span></div>`).join('')}</div>` : '<p>아직 집계 없음</p>')}
       ${artifactGuideCard(detail)}
       ${glossaryHtml('language_spec.json')}
       ${rawDetails('language_spec.json raw 보기', getArtifact(detail, 'language_spec.json'))}

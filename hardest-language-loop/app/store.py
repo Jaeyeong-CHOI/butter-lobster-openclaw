@@ -32,6 +32,9 @@ DEFAULT_SETTINGS = {
     "solver_thinking": "medium",
     "solver_repeat_count": 5,
     "solver_parallelism": 10,
+    "solver_request_timeout_seconds": 75,
+    "solver_max_retries": 3,
+    "solver_retry_backoff_base_seconds": 1.5,
     "provider_default": "openai",
 }
 

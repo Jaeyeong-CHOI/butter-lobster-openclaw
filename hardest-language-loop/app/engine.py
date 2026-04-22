@@ -302,6 +302,22 @@ class AgentLoopService:
     def _supports_reasoning(self, model_name: str) -> bool:
         return model_name.startswith("o") or model_name.startswith("gpt-5")
 
+    def _classify_failure_reason(self, message: str) -> str:
+        lowered = (message or "").lower()
+        if "429" in lowered or "rate limit" in lowered:
+            return "rate_limit"
+        if "timed out" in lowered or "timeout" in lowered or "read operation timed out" in lowered:
+            return "request_timeout"
+        if "no output_text found" in lowered or "empty or unavailable model response" in lowered or "empty/incomplete" in lowered:
+            return "empty_response"
+        if "unsupported parameter" in lowered:
+            return "request_parameter_error"
+        if "http 5" in lowered or "bad gateway" in lowered or "service unavailable" in lowered:
+            return "upstream_server_error"
+        if "http 4" in lowered:
+            return "request_rejected"
+        return "solver_error"
+
     def _extract_json_block(self, text: str) -> str:
         stripped = text.strip()
         if stripped.startswith("```"):
@@ -385,7 +401,11 @@ Interpreter:
         task: dict[str, Any],
         prompt_text: str,
     ) -> dict[str, Any]:
-        timeout_seconds = 75 if self._supports_reasoning(model_name) or thinking in {"medium", "high"} else 45
+        settings = store.get_settings()
+        configured_timeout = int(settings.get("solver_request_timeout_seconds", 75))
+        timeout_seconds = max(configured_timeout, 45) if (self._supports_reasoning(model_name) or thinking in {"medium", "high"}) else configured_timeout
+        max_attempts = int(settings.get("solver_max_retries", 3))
+        backoff_base = float(settings.get("solver_retry_backoff_base_seconds", 1.5))
 
         def _post(request_payload: dict[str, Any]) -> dict[str, Any]:
             req = urllib.request.Request(
@@ -401,7 +421,7 @@ Interpreter:
                 return json.loads(resp.read().decode("utf-8"))
 
         def _retry_delay(attempt_index: int) -> float:
-            return min(8.0, 1.5 * (2 ** max(0, attempt_index - 1)))
+            return min(12.0, backoff_base * (2 ** max(0, attempt_index - 1)))
 
         def _is_retryable_http(code: int) -> bool:
             return code in {408, 409, 429, 500, 502, 503, 504}
@@ -426,7 +446,6 @@ Interpreter:
         temperature_omitted = False
         request_payload = dict(payload)
         attempt_notes: list[str] = []
-        max_attempts = 3
 
         for attempt in range(1, max_attempts + 1):
             try:
@@ -445,6 +464,8 @@ Interpreter:
                     "temperature_omitted": temperature_omitted,
                     "retry_count": attempt - 1,
                     "request_timeout_seconds": timeout_seconds,
+                    "max_attempts": max_attempts,
+                    "retry_backoff_base_seconds": backoff_base,
                     "attempt_notes": attempt_notes,
                 }
             except urllib.error.HTTPError as exc:
@@ -541,6 +562,7 @@ Interpreter:
         execution_cases: list[dict[str, Any]] = []
         execution_stdout: list[str] = []
         program: dict[str, Any] | None = None
+        failure_reason = "success"
         prompt_text = self._solver_prompt(
             candidate=candidate,
             interpreter_source=interpreter_source,
@@ -591,12 +613,15 @@ Interpreter:
                 notes.append("simulated fallback used because OpenAI API key is missing")
         except Exception as exc:
             notes.append(str(exc))
+            failure_reason = self._classify_failure_reason(str(exc))
 
         if not isinstance(response_text, str) or not response_text.strip():
             if notes:
                 response_text = f"[empty or unavailable model response]\n{notes[-1]}"
             else:
                 response_text = "[empty or unavailable model response]"
+            if program is None:
+                failure_reason = "empty_response"
 
         if program is None:
             success = False
@@ -611,6 +636,7 @@ Interpreter:
                 score = 0.0
                 execution_ok = False
                 outputs_match = False
+                failure_reason = "parse_error"
             else:
                 case_programs = [
                     {
@@ -628,6 +654,15 @@ Interpreter:
                 outputs_match = bool(execution_cases) and all(case.get("match") for case in execution_cases)
                 success = execution_ok and outputs_match
                 score = round(sum(1 for case in execution_cases if case.get("match")) / len(execution_cases), 3) if execution_cases else 0.0
+                if not execution_ok:
+                    if execution.get("notes") and "timed out" in str(execution.get("notes", "")).lower():
+                        failure_reason = "validator_timeout"
+                    else:
+                        failure_reason = "execution_failure"
+                elif not outputs_match:
+                    failure_reason = "wrong_output"
+                else:
+                    failure_reason = "success"
 
         return {
             "id": f"eval-{uuid.uuid4().hex[:12]}",
@@ -659,6 +694,9 @@ Interpreter:
                 "temperature": temperature,
                 "request_timeout_seconds": solve.get("request_timeout_seconds") if 'solve' in locals() and isinstance(solve, dict) else None,
                 "retry_count": solve.get("retry_count") if 'solve' in locals() and isinstance(solve, dict) else 0,
+                "max_attempts": solve.get("max_attempts") if 'solve' in locals() and isinstance(solve, dict) else None,
+                "retry_backoff_base_seconds": solve.get("retry_backoff_base_seconds") if 'solve' in locals() and isinstance(solve, dict) else None,
+                "failure_reason": failure_reason,
             },
         }
 
@@ -746,9 +784,13 @@ Interpreter:
 
         by_model: dict[str, list[dict[str, Any]]] = defaultdict(list)
         by_task: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        failure_reason_summary: dict[str, int] = defaultdict(int)
         for evaluation in evaluations:
             by_model[evaluation["model_name"]].append(evaluation)
             by_task[evaluation["task_name"]].append(evaluation)
+            reason = (evaluation.get("metadata", {}) or {}).get("failure_reason")
+            if reason and reason != "success":
+                failure_reason_summary[reason] += 1
 
         hardest_models = []
         model_summary: dict[str, Any] = {}
@@ -790,6 +832,7 @@ Interpreter:
                 "prior_boundary": candidate["similarity_score"] >= 0.75 and candidate["conflict_score"] >= 0.65,
                 "model_summary": model_summary,
                 "task_summary": task_summary,
+                "failure_reason_summary": dict(sorted(failure_reason_summary.items())),
             },
         }
 

@@ -245,6 +245,18 @@
                 <span>최대 동시 요청 수</span>
                 <input id="solverParallelismInput" type="number" min="1" max="50" step="1" />
               </label>
+              <label class="control-block">
+                <span>요청 timeout (초)</span>
+                <input id="solverTimeoutInput" type="number" min="15" max="300" step="1" />
+              </label>
+              <label class="control-block">
+                <span>최대 재시도 횟수</span>
+                <input id="solverMaxRetriesInput" type="number" min="1" max="8" step="1" />
+              </label>
+              <label class="control-block">
+                <span>재시도 backoff 시작값 (초)</span>
+                <input id="solverRetryBackoffInput" type="number" min="0.25" max="10" step="0.25" />
+              </label>
             </div>
           </section>
         </div>

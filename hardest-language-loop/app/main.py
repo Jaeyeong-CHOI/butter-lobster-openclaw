@@ -43,6 +43,9 @@ def _config_response(settings: dict[str, object]) -> dict[str, object]:
             "thinking": settings.get("solver_thinking", "medium"),
             "repeat_count": settings.get("solver_repeat_count", 5),
             "parallelism": settings.get("solver_parallelism", 10),
+            "request_timeout_seconds": settings.get("solver_request_timeout_seconds", 75),
+            "max_retries": settings.get("solver_max_retries", 3),
+            "retry_backoff_base_seconds": settings.get("solver_retry_backoff_base_seconds", 1.5),
         },
         "providers": {"openai": {"api_key": store.get_openai_api_key_status()}},
     }
@@ -154,6 +157,27 @@ async def api_config_update(payload: dict = Body(...)) -> JSONResponse:
                 raise HTTPException(status_code=400, detail="parallelism must be between 1 and 50")
             store.set_setting("solver_parallelism", parallel)
             solver_changes.append("parallelism")
+        request_timeout_seconds = solver_payload.get("request_timeout_seconds")
+        if request_timeout_seconds is not None:
+            timeout_value = int(request_timeout_seconds)
+            if timeout_value < 15 or timeout_value > 300:
+                raise HTTPException(status_code=400, detail="request_timeout_seconds must be between 15 and 300")
+            store.set_setting("solver_request_timeout_seconds", timeout_value)
+            solver_changes.append("request_timeout_seconds")
+        max_retries = solver_payload.get("max_retries")
+        if max_retries is not None:
+            retries = int(max_retries)
+            if retries < 1 or retries > 8:
+                raise HTTPException(status_code=400, detail="max_retries must be between 1 and 8")
+            store.set_setting("solver_max_retries", retries)
+            solver_changes.append("max_retries")
+        retry_backoff_base_seconds = solver_payload.get("retry_backoff_base_seconds")
+        if retry_backoff_base_seconds is not None:
+            backoff = float(retry_backoff_base_seconds)
+            if backoff < 0.25 or backoff > 10:
+                raise HTTPException(status_code=400, detail="retry_backoff_base_seconds must be between 0.25 and 10")
+            store.set_setting("solver_retry_backoff_base_seconds", round(backoff, 2))
+            solver_changes.append("retry_backoff_base_seconds")
         if solver_changes:
             changed["solver_bench"] = solver_changes
 
