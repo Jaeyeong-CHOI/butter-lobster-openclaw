@@ -378,6 +378,19 @@ Interpreter:
         task: dict[str, Any],
         prompt_text: str,
     ) -> dict[str, Any]:
+        def _post(request_payload: dict[str, Any]) -> dict[str, Any]:
+            req = urllib.request.Request(
+                "https://api.openai.com/v1/responses",
+                data=json.dumps(request_payload).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+
         payload: dict[str, Any] = {
             "model": model_name,
             "input": [
@@ -395,21 +408,38 @@ Interpreter:
         if thinking != "off" and self._supports_reasoning(model_name):
             payload["reasoning"] = {"effort": thinking}
 
-        req = urllib.request.Request(
-            "https://api.openai.com/v1/responses",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {api_key}",
-            },
-            method="POST",
-        )
+        temperature_omitted = False
         try:
-            with urllib.request.urlopen(req, timeout=45) as resp:
-                raw = json.loads(resp.read().decode("utf-8"))
+            raw = _post(payload)
         except urllib.error.HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError(f"OpenAI HTTP {exc.code}: {detail}") from exc
+            error_payload: dict[str, Any] | None = None
+            try:
+                error_payload = json.loads(detail)
+            except Exception:
+                error_payload = None
+
+            error_info = (error_payload or {}).get("error", {}) if isinstance(error_payload, dict) else {}
+            error_message = str(error_info.get("message", detail))
+            error_param = error_info.get("param")
+
+            if (
+                exc.code == 400
+                and "temperature" in payload
+                and (error_param == "temperature" or "temperature" in error_message.lower())
+            ):
+                retry_payload = dict(payload)
+                retry_payload.pop("temperature", None)
+                temperature_omitted = True
+                try:
+                    raw = _post(retry_payload)
+                except urllib.error.HTTPError as retry_exc:
+                    retry_detail = retry_exc.read().decode("utf-8", errors="replace")
+                    raise RuntimeError(f"OpenAI HTTP {retry_exc.code}: {retry_detail}") from retry_exc
+                except urllib.error.URLError as retry_exc:
+                    raise RuntimeError(f"OpenAI request failed: {retry_exc}") from retry_exc
+            else:
+                raise RuntimeError(f"OpenAI HTTP {exc.code}: {detail}") from exc
         except urllib.error.URLError as exc:
             raise RuntimeError(f"OpenAI request failed: {exc}") from exc
 
@@ -424,6 +454,7 @@ Interpreter:
             "program": program,
             "raw_response": raw,
             "response_text": output_text,
+            "temperature_omitted": temperature_omitted,
         }
 
     def _simulate_attempt(
@@ -507,6 +538,8 @@ Interpreter:
                     "usage": raw.get("usage"),
                 }
                 response_text = solve.get("response_text", "")
+                if solve.get("temperature_omitted"):
+                    notes.append("temperature omitted because the selected model does not support that parameter")
             else:
                 solve = self._simulate_attempt(
                     candidate=candidate,
