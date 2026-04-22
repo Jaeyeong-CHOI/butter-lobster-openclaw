@@ -4,6 +4,8 @@ import asyncio
 import json
 import random
 import re
+import socket
+import time
 import urllib.error
 import urllib.request
 import uuid
@@ -383,6 +385,8 @@ Interpreter:
         task: dict[str, Any],
         prompt_text: str,
     ) -> dict[str, Any]:
+        timeout_seconds = 75 if self._supports_reasoning(model_name) or thinking in {"medium", "high"} else 45
+
         def _post(request_payload: dict[str, Any]) -> dict[str, Any]:
             req = urllib.request.Request(
                 "https://api.openai.com/v1/responses",
@@ -393,8 +397,14 @@ Interpreter:
                 },
                 method="POST",
             )
-            with urllib.request.urlopen(req, timeout=45) as resp:
+            with urllib.request.urlopen(req, timeout=timeout_seconds) as resp:
                 return json.loads(resp.read().decode("utf-8"))
+
+        def _retry_delay(attempt_index: int) -> float:
+            return min(8.0, 1.5 * (2 ** max(0, attempt_index - 1)))
+
+        def _is_retryable_http(code: int) -> bool:
+            return code in {408, 409, 429, 500, 502, 503, 504}
 
         payload: dict[str, Any] = {
             "model": model_name,
@@ -414,53 +424,71 @@ Interpreter:
             payload["reasoning"] = {"effort": thinking}
 
         temperature_omitted = False
-        try:
-            raw = _post(payload)
-        except urllib.error.HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")
-            error_payload: dict[str, Any] | None = None
+        request_payload = dict(payload)
+        attempt_notes: list[str] = []
+        max_attempts = 3
+
+        for attempt in range(1, max_attempts + 1):
             try:
-                error_payload = json.loads(detail)
-            except Exception:
-                error_payload = None
-
-            error_info = (error_payload or {}).get("error", {}) if isinstance(error_payload, dict) else {}
-            error_message = str(error_info.get("message", detail))
-            error_param = error_info.get("param")
-
-            if (
-                exc.code == 400
-                and "temperature" in payload
-                and (error_param == "temperature" or "temperature" in error_message.lower())
-            ):
-                retry_payload = dict(payload)
-                retry_payload.pop("temperature", None)
-                temperature_omitted = True
+                raw = _post(request_payload)
+                output_text = self._extract_response_text(raw)
+                json_text = self._extract_json_block(output_text)
+                parsed = json.loads(json_text)
+                if isinstance(parsed, dict) and "program" in parsed and isinstance(parsed["program"], dict):
+                    program = parsed["program"]
+                else:
+                    program = parsed
+                return {
+                    "program": program,
+                    "raw_response": raw,
+                    "response_text": output_text,
+                    "temperature_omitted": temperature_omitted,
+                    "retry_count": attempt - 1,
+                    "request_timeout_seconds": timeout_seconds,
+                    "attempt_notes": attempt_notes,
+                }
+            except urllib.error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="replace")
+                error_payload: dict[str, Any] | None = None
                 try:
-                    raw = _post(retry_payload)
-                except urllib.error.HTTPError as retry_exc:
-                    retry_detail = retry_exc.read().decode("utf-8", errors="replace")
-                    raise RuntimeError(f"OpenAI HTTP {retry_exc.code}: {retry_detail}") from retry_exc
-                except urllib.error.URLError as retry_exc:
-                    raise RuntimeError(f"OpenAI request failed: {retry_exc}") from retry_exc
-            else:
-                raise RuntimeError(f"OpenAI HTTP {exc.code}: {detail}") from exc
-        except urllib.error.URLError as exc:
-            raise RuntimeError(f"OpenAI request failed: {exc}") from exc
+                    error_payload = json.loads(detail)
+                except Exception:
+                    error_payload = None
 
-        output_text = self._extract_response_text(raw)
-        json_text = self._extract_json_block(output_text)
-        parsed = json.loads(json_text)
-        if isinstance(parsed, dict) and "program" in parsed and isinstance(parsed["program"], dict):
-            program = parsed["program"]
-        else:
-            program = parsed
-        return {
-            "program": program,
-            "raw_response": raw,
-            "response_text": output_text,
-            "temperature_omitted": temperature_omitted,
-        }
+                error_info = (error_payload or {}).get("error", {}) if isinstance(error_payload, dict) else {}
+                error_message = str(error_info.get("message", detail))
+                error_param = error_info.get("param")
+
+                if (
+                    exc.code == 400
+                    and "temperature" in request_payload
+                    and (error_param == "temperature" or "temperature" in error_message.lower())
+                ):
+                    request_payload = dict(request_payload)
+                    request_payload.pop("temperature", None)
+                    temperature_omitted = True
+                    attempt_notes.append("temperature parameter removed and request retried")
+                    continue
+
+                if _is_retryable_http(exc.code) and attempt < max_attempts:
+                    attempt_notes.append(f"transient OpenAI HTTP {exc.code} on attempt {attempt}: retrying")
+                    time.sleep(_retry_delay(attempt))
+                    continue
+                raise RuntimeError(f"OpenAI HTTP {exc.code}: {detail}") from exc
+            except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+                if attempt < max_attempts:
+                    attempt_notes.append(f"network timeout/error on attempt {attempt}: {exc}")
+                    time.sleep(_retry_delay(attempt))
+                    continue
+                raise RuntimeError(f"OpenAI request failed after {max_attempts} attempts: {exc}") from exc
+            except ValueError as exc:
+                if attempt < max_attempts and "No output_text found" in str(exc):
+                    attempt_notes.append(f"empty/incomplete model response on attempt {attempt}: retrying")
+                    time.sleep(_retry_delay(attempt))
+                    continue
+                raise
+
+        raise RuntimeError("OpenAI request failed without a usable response")
 
     def _simulate_attempt(
         self,
@@ -545,6 +573,10 @@ Interpreter:
                 response_text = solve.get("response_text", "")
                 if solve.get("temperature_omitted"):
                     notes.append("temperature omitted because the selected model does not support that parameter")
+                if solve.get("retry_count"):
+                    notes.append(f"request succeeded after {solve['retry_count']} retry(s)")
+                for attempt_note in solve.get("attempt_notes", []):
+                    notes.append(attempt_note)
             else:
                 solve = self._simulate_attempt(
                     candidate=candidate,
@@ -625,6 +657,8 @@ Interpreter:
                 "prompt": prompt_text,
                 "thinking": thinking,
                 "temperature": temperature,
+                "request_timeout_seconds": solve.get("request_timeout_seconds") if 'solve' in locals() and isinstance(solve, dict) else None,
+                "retry_count": solve.get("retry_count") if 'solve' in locals() and isinstance(solve, dict) else 0,
             },
         }
 
