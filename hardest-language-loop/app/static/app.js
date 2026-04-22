@@ -312,6 +312,108 @@ function bindMetricTriggers(scope = document) {
   });
 }
 
+function bindSolverCellTriggers(scope = document) {
+  scope.querySelectorAll('[data-solver-model][data-solver-task]').forEach((el) => {
+    el.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openSolverCellModal(el.dataset.solverModel, el.dataset.solverTask);
+    });
+  });
+}
+
+function openSolverCellModal(modelName, taskName) {
+  const detail = state.selectedCandidate;
+  if (!detail) return;
+  const evaluations = (detail.evaluations || [])
+    .filter((row) => row.model_name === modelName && row.task_name === taskName)
+    .sort((a, b) => (a.metadata?.attempt_index || 0) - (b.metadata?.attempt_index || 0));
+
+  const bodyHtml = !evaluations.length
+    ? `
+      <section class="detail-section">
+        <h3>아직 평가 없음</h3>
+        <p>이 model/task 조합에 대한 반복 시도가 아직 기록되지 않았다.</p>
+      </section>
+    `
+    : evaluations.map((row) => {
+      const meta = row.metadata || {};
+      const cases = meta.cases || [];
+      const parseErrors = meta.parse_errors || [];
+      const stdout = meta.stdout || [];
+      const responseText = meta.response_text || '이전 실행 기록에는 모델 출력 원문이 저장되지 않았거나 비어 있다.';
+      const promptText = meta.prompt || '이전 실행 기록에는 모델 입력 프롬프트가 저장되지 않았다. 새로 실행한 candidate부터 이 값이 채워진다.';
+      const usage = meta.raw_response?.usage ? JSON.stringify(meta.raw_response.usage, null, 2) : '';
+      return `
+        <section class="detail-section">
+          <h3>시도 #${meta.attempt_index || '?'} · ${escapeHtml(modelName)} · ${escapeHtml(taskName)}</h3>
+          <div class="pills">
+            ${pill(row.success ? 'success' : 'failure', row.success ? 'tone-green' : 'tone-neutral')}
+            ${pill(`score ${row.score ?? 0}`)}
+            ${pill(`execution ${meta.execution_ok ? 'ok' : 'fail'}`, meta.execution_ok ? 'tone-green' : 'tone-neutral')}
+            ${pill(`outputs ${meta.outputs_match ? 'match' : 'mismatch'}`, meta.outputs_match ? 'tone-green' : 'tone-neutral')}
+          </div>
+          <div class="detail-split-grid">
+            <div>
+              <h4 class="detail-subhead">모델 입력 프롬프트</h4>
+              ${codeBlock(promptText)}
+            </div>
+            <div>
+              <h4 class="detail-subhead">모델 출력</h4>
+              ${codeBlock(responseText)}
+            </div>
+          </div>
+          <div class="detail-split-grid">
+            <div>
+              <h4 class="detail-subhead">OCaml 실행 결과</h4>
+              <div class="detail-mini-grid">
+                ${kv('Execution', meta.execution_ok ? 'ok' : 'fail')}
+                ${kv('Outputs match', meta.outputs_match ? 'yes' : 'no')}
+                ${kv('Thinking', meta.thinking || '—')}
+                ${kv('Temperature', meta.temperature ?? '—')}
+              </div>
+              ${cases.length ? `
+                <div class="case-list">
+                  ${cases.map((caseRow) => `
+                    <div class="case-row ${caseRow.match ? 'pass' : 'fail'}">
+                      <div><strong>${escapeHtml(caseRow.label || 'case')}</strong></div>
+                      <div>actual ${escapeHtml(String(caseRow.actual))} / expected ${escapeHtml(String(caseRow.expected))}</div>
+                    </div>
+                  `).join('')}
+                </div>
+              ` : '<p>개별 case 결과가 아직 없다.</p>'}
+              ${stdout.length ? `
+                <h4 class="detail-subhead">OCaml stdout</h4>
+                ${codeBlock(stdout.join('\n'))}
+              ` : ''}
+            </div>
+            <div>
+              <h4 class="detail-subhead">Validator 메모</h4>
+              ${row.notes ? `<p>${escapeHtml(row.notes)}</p>` : '<p>별도 notes 없음</p>'}
+              ${parseErrors.length ? `
+                <h4 class="detail-subhead">Parse errors</h4>
+                <ul>
+                  ${parseErrors.map((err) => `<li>${escapeHtml(err)}</li>`).join('')}
+                </ul>
+              ` : ''}
+              ${usage ? `
+                <h4 class="detail-subhead">API usage</h4>
+                ${codeBlock(usage)}
+              ` : ''}
+            </div>
+          </div>
+        </section>
+      `;
+    }).join('');
+
+  openDetailModal({
+    kicker: 'Solver heatmap cell',
+    title: `${modelName} · ${taskName}`,
+    subtitle: `${evaluations.length}개 시도 기록 · prompt / output / OCaml validator 결과`,
+    bodyHtml,
+  });
+}
+
 function glossaryHtml(path) {
   const entry = artifactGlossary[path];
   if (!entry) return '';
@@ -869,7 +971,8 @@ function renderSolverBenchMonitor() {
             modelSuccess += bucket.success;
             modelTotal += bucket.total;
             const tone = bucket.total === 0 ? 'pending' : (bucket.success === bucket.total ? 'full' : (bucket.success > 0 ? 'partial' : 'empty'));
-            return `<td><div class="solver-cell ${tone}"><strong>${bucket.success}/${repeatCount}</strong><span>${bucket.total}/${repeatCount} 완료</span></div></td>`;
+            const clickable = bucket.total > 0 ? 'interactive' : 'disabled';
+            return `<td><button type="button" class="solver-cell ${tone} ${clickable}" ${bucket.total > 0 ? `data-solver-model="${escapeHtml(modelName)}" data-solver-task="${escapeHtml(task)}"` : 'disabled'}><strong>${bucket.success}/${repeatCount}</strong><span>${bucket.total}/${repeatCount} 완료</span></button></td>`;
           }).join('');
           return `
             <tr>
@@ -894,6 +997,7 @@ function renderSolverBenchMonitor() {
     </div>
     ${table}
   `;
+  bindSolverCellTriggers(solverBenchMonitor);
 }
 
 function artifactGuideCard(detail) {

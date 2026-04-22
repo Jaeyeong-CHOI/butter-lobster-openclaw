@@ -328,19 +328,15 @@ class AgentLoopService:
                     return content["text"].strip()
         raise ValueError("No output_text found in OpenAI response")
 
-    def _solve_with_openai(
+    def _solver_prompt(
         self,
         *,
-        api_key: str,
-        model_name: str,
-        thinking: str,
-        temperature: float,
         candidate: dict[str, Any],
         interpreter_source: str,
         ast_schema: dict[str, Any],
         task: dict[str, Any],
-    ) -> dict[str, Any]:
-        prompt = f"""You are Agent B for the hardest-language benchmark.
+    ) -> str:
+        return f"""You are Agent B for the hardest-language benchmark.
 Return ONLY a JSON object for a top-level exp AST.
 No markdown fences. No explanation.
 
@@ -369,6 +365,19 @@ Interpreter:
 {interpreter_source}
 """
 
+    def _solve_with_openai(
+        self,
+        *,
+        api_key: str,
+        model_name: str,
+        thinking: str,
+        temperature: float,
+        candidate: dict[str, Any],
+        interpreter_source: str,
+        ast_schema: dict[str, Any],
+        task: dict[str, Any],
+        prompt_text: str,
+    ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": model_name,
             "input": [
@@ -378,7 +387,7 @@ Interpreter:
                 },
                 {
                     "role": "user",
-                    "content": [{"type": "input_text", "text": prompt}],
+                    "content": [{"type": "input_text", "text": prompt_text}],
                 },
             ],
             "temperature": temperature,
@@ -468,6 +477,12 @@ Interpreter:
         execution_cases: list[dict[str, Any]] = []
         execution_stdout: list[str] = []
         program: dict[str, Any] | None = None
+        prompt_text = self._solver_prompt(
+            candidate=candidate,
+            interpreter_source=interpreter_source,
+            ast_schema=ast_schema,
+            task=task,
+        )
 
         try:
             if api_key:
@@ -481,6 +496,7 @@ Interpreter:
                     interpreter_source=interpreter_source,
                     ast_schema=ast_schema,
                     task=task,
+                    prompt_text=prompt_text,
                 )
                 program = solve["program"]
                 raw = solve.get("raw_response") or {}
@@ -562,6 +578,7 @@ Interpreter:
                 "stdout": execution_stdout,
                 "response_text": response_text,
                 "raw_response": raw_response,
+                "prompt": prompt_text,
                 "thinking": thinking,
                 "temperature": temperature,
             },
