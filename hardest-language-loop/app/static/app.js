@@ -177,6 +177,11 @@ function codeBlock(text = '') {
   return `<pre class="code-block">${escapeHtml(text)}</pre>`;
 }
 
+function displayText(value, fallback) {
+  if (typeof value !== 'string') return fallback;
+  return value.trim() ? value : fallback;
+}
+
 function rawDetails(title, text = '') {
   return `
     <details class="raw-details">
@@ -341,8 +346,8 @@ function openSolverCellModal(modelName, taskName) {
       const cases = meta.cases || [];
       const parseErrors = meta.parse_errors || [];
       const stdout = meta.stdout || [];
-      const responseText = meta.response_text || '이전 실행 기록에는 모델 출력 원문이 저장되지 않았거나 비어 있다.';
-      const promptText = meta.prompt || '이전 실행 기록에는 모델 입력 프롬프트가 저장되지 않았다. 새로 실행한 candidate부터 이 값이 채워진다.';
+      const responseText = displayText(meta.response_text, '이 시도에는 모델 출력 원문이 없거나 비어 있다. notes/response status를 확인해줘.');
+      const promptText = displayText(meta.prompt, '이전 실행 기록에는 모델 입력 프롬프트가 저장되지 않았다. 새로 실행한 candidate부터 이 값이 채워진다.');
       const usage = meta.raw_response?.usage ? JSON.stringify(meta.raw_response.usage, null, 2) : '';
       return `
         <section class="detail-section">

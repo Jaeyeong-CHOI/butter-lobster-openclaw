@@ -326,7 +326,12 @@ class AgentLoopService:
             for content in item.get("content", []):
                 if content.get("type") == "output_text" and isinstance(content.get("text"), str):
                     return content["text"].strip()
-        raise ValueError("No output_text found in OpenAI response")
+        status = payload.get("status")
+        incomplete = payload.get("incomplete_details")
+        output_types = [item.get("type") for item in payload.get("output", []) if isinstance(item, dict)]
+        raise ValueError(
+            f"No output_text found in OpenAI response (status={status}, incomplete={incomplete}, output_types={output_types})"
+        )
 
     def _solver_prompt(
         self,
@@ -554,6 +559,12 @@ Interpreter:
                 notes.append("simulated fallback used because OpenAI API key is missing")
         except Exception as exc:
             notes.append(str(exc))
+
+        if not isinstance(response_text, str) or not response_text.strip():
+            if notes:
+                response_text = f"[empty or unavailable model response]\n{notes[-1]}"
+            else:
+                response_text = "[empty or unavailable model response]"
 
         if program is None:
             success = False
