@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+*.env
+!.env.example
+data/*.db*
+data/*.json
+data/secrets.json
+data/candidates/
+data/backups/
+data/runs/
+data/experiments/*
+!data/experiments/.gitkeep
