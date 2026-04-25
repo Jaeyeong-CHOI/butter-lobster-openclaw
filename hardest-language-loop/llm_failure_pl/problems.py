@@ -109,7 +109,13 @@ def default_language_spec() -> LanguageSpec:
             "Python-near JSON-AST language. Arithmetic/comparison are Python-like, "
             "but empty strings/lists/dicts are truthy."
         ),
-        semantic_rules={"truthiness": "empty_true", "if_semantics": "normal", "comparison_semantics": "normal"},
+        semantic_rules={
+            "truthiness": "empty_true",
+            "if_semantics": "normal",
+            "comparison_semantics": "normal",
+            "arithmetic_semantics": "normal",
+            "literal_semantics": "normal",
+        },
     )
 
 

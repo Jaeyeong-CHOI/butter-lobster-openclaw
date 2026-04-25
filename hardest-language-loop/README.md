@@ -32,9 +32,11 @@ llm_failure_pl/
 docs/
   agent-prompts-and-settings.md
   related-work-agent-search.md
+  reproducibility.md
 
 scripts/
   check_secrets.py
+  compare_runs.py
   explore_languages.py
   export_problem_set.py
   run_agent_smoke.py
@@ -65,11 +67,21 @@ python3 scripts/export_problem_set.py
 ## Language search pilot
 
 ```bash
-python3 scripts/explore_languages.py --candidates 3 --problem-limit 6
+python3 scripts/explore_languages.py --candidate-source agent --candidates 3 --problem-limit 6
 ```
 
 This asks the language designer for candidate semantic rules, evaluates each candidate with the configured solver models, validates JSON-AST programs with the Python interpreter, and stores a scored strategy tree under `data/runs/<run_id>/`.
 
+For reproducible runs, use the deterministic seed catalog or replay a saved candidate set:
+
+```bash
+python3 scripts/explore_languages.py --candidate-source seed --candidates 6 --problem-limit 6 --seed 20260424
+python3 scripts/explore_languages.py --candidate-source file --candidate-file data/runs/<run_id>/artifacts/candidate_languages.json --candidates 6 --problem-limit 6 --seed 20260424
+python3 scripts/compare_runs.py data/runs/<baseline_run_id> data/runs/<replay_run_id>
+```
+
 ## Related work
 
 See `docs/related-work-agent-search.md` for notes on FunSearch-style evolutionary search, language-agent tree search, automated red teaming/benchmark generation, and PL-semantics robustness work that should inform the next search-loop design.
+
+See `docs/reproducibility.md` for the run/replay/compare protocol and the exact artifacts each run writes.

@@ -16,14 +16,30 @@ class LanguageDesignerAgent(BaseAgent):
 
     @staticmethod
     def new_strategy_tree() -> StrategyTree:
-        return StrategyTree.new(
-            title="Open exploration of Python-near semantic interference",
+        tree = StrategyTree.new(
+            title="Open exploration of LLM-resistant programming-language semantics",
             hypothesis=(
-                "LLMs may fail when a language looks Python-like but one semantic rule quietly diverges "
-                "from the Python prior."
+                "Search broadly over executable toy-language semantics instead of assuming a Python-near answer. "
+                "Use the strategy tree to compare semantic families, preserve diversity, and expand branches that "
+                "produce reproducible solver failures."
             ),
-            tags=["clean-slate", "python-near", "semantic-interference"],
+            tags=["clean-slate", "open-search", "semantic-interference", "quality-diversity"],
         )
+        root = tree.get(tree.root_id)
+        root.artifacts["search_dimensions"] = {
+            "surface_distance": ["python-near", "python-far", "abstract-json-ast"],
+            "semantic_families": [
+                "truthiness",
+                "control-flow",
+                "comparison",
+                "arithmetic",
+                "literal",
+                "binding",
+                "evaluation-order",
+            ],
+            "selection_policy": "expand both high-failure and underexplored families; do not lock onto Python-near a priori",
+        }
+        return tree
 
     def prompt(self, tree: StrategyTree, recent_results: list[dict[str, Any]] | None = None) -> AgentPrompt:
         return AgentPrompt(

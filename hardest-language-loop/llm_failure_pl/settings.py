@@ -64,6 +64,7 @@ class RunSettings:
             model="gpt-5.4",
             temperature=0.8,
             thinking="extra_high",
+            max_output_tokens=12000,
         )
     )
     solver: AgentSettings = field(

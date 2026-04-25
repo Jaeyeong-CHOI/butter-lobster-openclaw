@@ -40,6 +40,8 @@ def default_language_spec() -> LanguageSpec:
             "truthiness": "python",
             "if_semantics": "normal",
             "comparison_semantics": "normal",
+            "arithmetic_semantics": "normal",
+            "literal_semantics": "normal",
         },
     )
 
@@ -65,7 +67,23 @@ class PythonToyInterpreter:
             return is_numeric_zero or bool(value)
         if mode == "empty_true":
             return value in ([], "", {}) or bool(value)
+        if mode == "nonempty_false":
+            return not bool(value)
         raise InterpreterError(f"Unknown truthiness rule: {mode}")
+
+    def literal_value(self, value: Any) -> Any:
+        mode = self.spec.semantic_rules.get("literal_semantics", "normal")
+        if mode == "normal":
+            return value
+        if mode == "numeric_negated":
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                return -value
+            return value
+        if mode == "bool_inverted":
+            if isinstance(value, bool):
+                return not value
+            return value
+        raise InterpreterError(f"Unknown literal rule: {mode}")
 
     def eval(self, node: dict[str, Any], env: dict[str, Any] | None = None) -> Any:
         env = dict(env or {})
@@ -77,7 +95,7 @@ class PythonToyInterpreter:
         kind = node["type"]
 
         if kind == "literal":
-            return node.get("value")
+            return self.literal_value(node.get("value"))
         if kind == "var":
             name = node["name"]
             if name not in env:
@@ -107,18 +125,31 @@ class PythonToyInterpreter:
 
     def _apply_binop(self, op: str, left: Any, right: Any) -> Any:
         comparison_mode = self.spec.semantic_rules.get("comparison_semantics", "normal")
+        arithmetic_mode = self.spec.semantic_rules.get("arithmetic_semantics", "normal")
+        if arithmetic_mode not in {"normal", "plus_minus_swapped", "subtraction_reversed", "multiplication_as_addition"}:
+            raise InterpreterError(f"Unknown arithmetic rule: {arithmetic_mode}")
+        if comparison_mode not in {"normal", "inverted", "swapped_order"}:
+            raise InterpreterError(f"Unknown comparison rule: {comparison_mode}")
         if op == "+":
+            if arithmetic_mode == "plus_minus_swapped":
+                return left - right
             return left + right
         if op == "-":
+            if arithmetic_mode == "plus_minus_swapped":
+                return left + right
+            if arithmetic_mode == "subtraction_reversed":
+                return right - left
             return left - right
         if op == "*":
+            if arithmetic_mode == "multiplication_as_addition":
+                return left + right
             return left * right
         if op == "==":
             result = left == right
         elif op == "<":
-            result = left < right
+            result = left > right if comparison_mode == "swapped_order" else left < right
         elif op == ">":
-            result = left > right
+            result = left < right if comparison_mode == "swapped_order" else left > right
         else:
             raise InterpreterError(f"Unsupported binary operator: {op}")
         return not result if comparison_mode == "inverted" else result

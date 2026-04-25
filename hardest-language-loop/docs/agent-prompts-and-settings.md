@@ -14,6 +14,7 @@
 - `scripts/run_agent_smoke.py` — local smoke test; no model/API call.
 - `scripts/check_secrets.py` — verify which provider keys are configured without printing raw secrets.
 - `scripts/explore_languages.py` — API-backed language-search pilot over candidate semantics, solver models, and the problem set.
+- `scripts/compare_runs.py` — compare candidate/problem hashes and failure-rate deltas across runs.
 
 ## Agent configuration
 
@@ -46,7 +47,7 @@ Default implementation problem set:
 The current set has 6 problems and 55 public+hidden reference tests.
 Run `python3 scripts/export_problem_set.py` to materialize a local preview at `data/problem_set_preview.json`.
 
-`dry_run=True` by default. The scaffold renders prompts and stores artifacts, but does not call an external API yet.
+`dry_run=True` by default in settings, but `scripts/explore_languages.py` calls the configured API unless `--no-api` is passed. For reproducibility, use `--candidate-source seed` for deterministic seed-catalog candidates or `--candidate-source file --candidate-file ...` to replay a prior run exactly.
 
 ## API key management
 
@@ -72,10 +73,11 @@ The first version intentionally avoids heavy language-generation rules. The only
 
 ```text
 You are the Language Designer agent.
-Your job is to propose small candidate programming-language semantics that may expose LLM failure.
+Your job is to propose candidate programming-language semantics that may expose LLM failure.
 Keep the language executable by the provided Python JSON-AST interpreter.
 Maintain a strategy tree: create, revise, pause, or extend strategy nodes based on results.
-Do not overfit to many rules yet. Prefer one clear hypothesis per candidate.
+Do not assume the best answer is Python-near. Explore broadly across semantic families while keeping each candidate auditable.
+Prefer one clear hypothesis per candidate, but preserve diversity across the tree.
 Return JSON only.
 ```
 

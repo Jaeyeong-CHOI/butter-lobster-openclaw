@@ -7,10 +7,11 @@ from .strategy_tree import StrategyTree
 
 
 LANGUAGE_DESIGNER_SYSTEM = """You are the Language Designer agent.
-Your job is to propose small candidate programming-language semantics that may expose LLM failure.
+Your job is to propose candidate programming-language semantics that may expose LLM failure.
 Keep the language executable by the provided Python JSON-AST interpreter.
 Maintain a strategy tree: create, revise, pause, or extend strategy nodes based on results.
-Do not overfit to many rules yet. Prefer one clear hypothesis per candidate.
+Do not assume the best answer is Python-near. Explore broadly across semantic families while keeping each candidate auditable.
+Prefer one clear hypothesis per candidate, but preserve diversity across the tree.
 Return JSON only."""
 
 SOLVER_SYSTEM = """You are the Solver agent.
@@ -32,6 +33,13 @@ INTERPRETER_CONTRACT = {
         "if": {"type": "if", "cond": "expr", "then": "expr", "else": "expr"},
         "binop": {"type": "binop", "op": "+|-|*|==|<|>", "left": "expr", "right": "expr"},
     },
+    "semantic_rule_dimensions": {
+        "truthiness": "python | inverted | zero_true | empty_true | nonempty_false",
+        "if_semantics": "normal | inverted",
+        "comparison_semantics": "normal | inverted | swapped_order",
+        "arithmetic_semantics": "normal | plus_minus_swapped | subtraction_reversed | multiplication_as_addition",
+        "literal_semantics": "normal | numeric_negated | bool_inverted",
+    },
 }
 
 
@@ -41,7 +49,10 @@ def tree_summary(tree: StrategyTree) -> dict[str, Any]:
 
 def language_designer_user_prompt(tree: StrategyTree, recent_results: list[dict[str, Any]] | None = None) -> str:
     payload = {
-        "goal": "Find Python-near language semantics that make LLMs fail for semantic, not syntax, reasons.",
+        "goal": (
+            "Find executable language semantics that make LLMs fail for semantic, not syntax, reasons. "
+            "Do not preselect Python-near as the answer; use the tree to explore and compare broad semantic families."
+        ),
         "strategy_tree": tree_summary(tree),
         "recent_results": recent_results or [],
         "interpreter_contract": INTERPRETER_CONTRACT,
@@ -61,9 +72,11 @@ def language_designer_user_prompt(tree: StrategyTree, recent_results: list[dict[
                 "name": "candidate language name",
                 "description": "brief semantics summary",
                 "semantic_rules": {
-                    "truthiness": "python | inverted | zero_true | empty_true",
+                    "truthiness": "python | inverted | zero_true | empty_true | nonempty_false",
                     "if_semantics": "normal | inverted",
-                    "comparison_semantics": "normal | inverted",
+                    "comparison_semantics": "normal | inverted | swapped_order",
+                    "arithmetic_semantics": "normal | plus_minus_swapped | subtraction_reversed | multiplication_as_addition",
+                    "literal_semantics": "normal | numeric_negated | bool_inverted",
                 },
             },
             "task_ideas": [
