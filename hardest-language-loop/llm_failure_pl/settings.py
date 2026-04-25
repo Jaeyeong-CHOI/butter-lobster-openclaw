@@ -47,8 +47,8 @@ class SolverModelSettings:
 
 def default_solver_models() -> list[SolverModelSettings]:
     return [
-        SolverModelSettings(provider="openai", model="gpt-5.5", temperature=0.0, thinking="medium", repeats=10),
-        SolverModelSettings(provider="openai", model="gpt-4o-mini", temperature=0.0, thinking="medium", repeats=10),
+        SolverModelSettings(provider="openai", model="gpt-5.5", temperature=0.0, thinking="medium", repeats=1),
+        SolverModelSettings(provider="openai", model="gpt-4o-mini", temperature=0.0, thinking="medium", repeats=1),
         SolverModelSettings(
             provider="vllm",
             model="gemma-4-31b-it",

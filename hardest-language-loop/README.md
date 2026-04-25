@@ -9,7 +9,7 @@ Clean-slate Python-first scaffold for exploring programming-language semantics t
 - Experiment state is stored as versioned files under `loop_result/v0`, `loop_result/v1`, ... by default.
 - The language designer agent owns a strategy tree and can create/mutate nodes based on results.
 - The language designer uses `thinking=extra_high`.
-- Solver benchmarking always includes `gpt-5.5`, `gpt-4o-mini`, local `gemma-4-31b-it` (`100.78.221.93:8000`), and local `qwen3.6-27b` (`100.78.221.93:8001`) with `temperature=0.0`, repeated 10 times per candidate/problem/model.
+- Solver benchmarking always includes `gpt-5.5`, `gpt-4o-mini`, local `gemma-4-31b-it` (`100.78.221.93:8000`), and local `qwen3.6-27b` (`100.78.221.93:8001`) with `temperature=0.0`; OpenAI solvers run once per candidate/problem, local vLLM solvers run 10 times.
 - Local vLLM solver calls use OpenAI-compatible chat completions and run in parallel by default (`max_parallel_solver_requests=8`); qwen disables thinking via `chat_template_kwargs.enable_thinking=false`.
 - The current default problem is an empty-string truthiness checksum trap.
 - The current benchmark set has 6 implementation problems / 55 reference tests.

@@ -30,14 +30,14 @@ Solver benchmark pool:
 
 | Provider | Model | Temperature | Thinking | Repeats |
 |---|---:|---:|---|---:|
-| `openai` | `gpt-5.5` | `0.0` | `medium` | `10` |
-| `openai` | `gpt-4o-mini` | `0.0` | `medium` | `10` |
+| `openai` | `gpt-5.5` | `0.0` | `medium` | `1` |
+| `openai` | `gpt-4o-mini` | `0.0` | `medium` | `1` |
 | `vllm` | `gemma-4-31b-it` @ `http://100.78.221.93:8000/v1` | `0.0` | `off` | `10` |
 | `vllm` | `qwen3.6-27b` @ `http://100.78.221.93:8001/v1` | `0.0` | `off` | `10` |
 
 Local vLLM solver endpoints use OpenAI-compatible `/chat/completions` with `VLLM_API_KEY=EMPTY` by default. Qwen is configured with `extra_body={"chat_template_kwargs": {"enable_thinking": false}}` so the solver benchmark does not spend tokens/time in thinking mode.
 
-Each solver model is run `10` times for every candidate/problem pair. Solver evaluations run concurrently by default with `RunSettings.max_parallel_solver_requests=8`; override per run with `--parallel-workers N`.
+OpenAI solver models are run once for every candidate/problem pair; local vLLM solver models are run `10` times. Solver evaluations run concurrently by default with `RunSettings.max_parallel_solver_requests=8`; override per run with `--parallel-workers N`.
 
 Default implementation problem set:
 
