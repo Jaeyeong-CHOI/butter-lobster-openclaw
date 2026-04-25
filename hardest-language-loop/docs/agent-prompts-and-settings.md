@@ -32,6 +32,12 @@ Solver benchmark pool:
 |---|---:|---:|---|---:|
 | `openai` | `gpt-5.4` | `0.0` | `medium` | `1` |
 | `openai` | `gpt-4o` | `0.0` | `medium` | `1` |
+| `vllm` | `gemma-4-31b-it` @ `http://100.78.221.93:8000/v1` | `0.0` | `off` | `1` |
+| `vllm` | `qwen3.6-27b` @ `http://100.78.221.93:8001/v1` | `0.0` | `off` | `1` |
+
+Local vLLM solver endpoints use OpenAI-compatible `/chat/completions` with `VLLM_API_KEY=EMPTY` by default. Qwen is configured with `extra_body={"chat_template_kwargs": {"enable_thinking": false}}` so the solver benchmark does not spend tokens/time in thinking mode.
+
+Solver evaluations run concurrently by default with `RunSettings.max_parallel_solver_requests=8`; override per run with `--parallel-workers N`.
 
 Default implementation problem set:
 
@@ -57,6 +63,7 @@ Use `.env.example` as the committed template and `.env` for local secrets.
 cp .env.example .env
 # fill OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY locally
 python3 scripts/check_secrets.py
+# VLLM_API_KEY can remain EMPTY for the local 100.78.221.93 servers.
 ```
 
 `llm_failure_pl/secrets.py` masks keys when reporting status and never needs real keys committed to git.

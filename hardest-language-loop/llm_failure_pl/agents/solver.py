@@ -18,7 +18,19 @@ class SolverAgent(BaseAgent):
     ) -> AgentPrompt:
         settings = dict(self.settings.to_dict())
         if solver_model:
-            settings.update({k: v for k, v in solver_model.items() if k in settings})
+            allowed_solver_overrides = {
+                "provider",
+                "model",
+                "temperature",
+                "thinking",
+                "max_output_tokens",
+                "response_format",
+                "base_url",
+                "api_key_env",
+                "timeout_seconds",
+                "extra_body",
+            }
+            settings.update({k: v for k, v in solver_model.items() if k in allowed_solver_overrides and v is not None})
         return AgentPrompt(
             system=SOLVER_SYSTEM,
             user=solver_user_prompt(language_spec, task, solver_model),

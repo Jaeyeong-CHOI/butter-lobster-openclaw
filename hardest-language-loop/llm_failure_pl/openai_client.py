@@ -65,6 +65,51 @@ def extract_response_text(payload: dict[str, Any]) -> str:
     )
 
 
+def extract_chat_response_text(payload: dict[str, Any]) -> str:
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise ValueError("No choices found in chat completion response")
+    message = choices[0].get("message") if isinstance(choices[0], dict) else None
+    if not isinstance(message, dict):
+        raise ValueError("No message found in first chat completion choice")
+    content = message.get("content")
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, dict) and isinstance(item.get("text"), str):
+                parts.append(item["text"])
+            elif isinstance(item, str):
+                parts.append(item)
+        joined = "".join(parts).strip()
+        if joined:
+            return joined
+    raise ValueError("No text content found in chat completion response")
+
+
+def settings_to_dict(settings: AgentSettings | dict[str, Any]) -> dict[str, Any]:
+    if isinstance(settings, AgentSettings):
+        return settings.to_dict()
+    return dict(settings)
+
+
+def settings_from_dict(settings: AgentSettings | dict[str, Any]) -> AgentSettings:
+    if isinstance(settings, AgentSettings):
+        return settings
+    settings_dict = settings_to_dict(settings)
+    return AgentSettings(
+        name=str(settings_dict.get("name", "agent")),
+        role=str(settings_dict.get("role", "")),
+        provider=str(settings_dict.get("provider", "openai")),
+        model=str(settings_dict.get("model", "gpt-4o")),
+        temperature=float(settings_dict.get("temperature", 0.0)),
+        thinking=str(settings_dict.get("thinking", "off")),
+        max_output_tokens=int(settings_dict.get("max_output_tokens", 4096)),
+        response_format=str(settings_dict.get("response_format", "json_object")),
+    )
+
+
 class OpenAIResponsesClient:
     def __init__(self, api_key: str, *, timeout_seconds: int = 90, max_attempts: int = 3) -> None:
         self.api_key = api_key
@@ -90,17 +135,7 @@ class OpenAIResponsesClient:
         return code in {408, 409, 429, 500, 502, 503, 504}
 
     def call_json(self, *, system: str, user: str, settings: AgentSettings | dict[str, Any]) -> dict[str, Any]:
-        if not isinstance(settings, AgentSettings):
-            settings = AgentSettings(
-                name=str(settings.get("name", "agent")),
-                role=str(settings.get("role", "")),
-                provider=str(settings.get("provider", "openai")),
-                model=str(settings.get("model", "gpt-4o")),
-                temperature=float(settings.get("temperature", 0.0)),
-                thinking=str(settings.get("thinking", "off")),
-                max_output_tokens=int(settings.get("max_output_tokens", 4096)),
-                response_format=str(settings.get("response_format", "json_object")),
-            )
+        settings = settings_from_dict(settings)
 
         payload: dict[str, Any] = {
             "model": settings.model,
@@ -179,3 +214,133 @@ class OpenAIResponsesClient:
                 raise OpenAIClientError(f"OpenAI response did not contain usable JSON: {exc}") from exc
 
         raise OpenAIClientError("OpenAI request failed without a usable response")
+
+
+class OpenAIChatCompletionsClient:
+    """OpenAI-compatible /v1/chat/completions client for local vLLM servers."""
+
+    def __init__(
+        self,
+        api_key: str = "EMPTY",
+        *,
+        base_url: str,
+        timeout_seconds: int = 120,
+        max_attempts: int = 3,
+    ) -> None:
+        self.api_key = api_key or "EMPTY"
+        self.base_url = base_url.rstrip("/")
+        self.timeout_seconds = timeout_seconds
+        self.max_attempts = max_attempts
+
+    def _post(self, payload: dict[str, Any]) -> dict[str, Any]:
+        req = urllib.request.Request(
+            f"{self.base_url}/chat/completions",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {self.api_key}"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=self.timeout_seconds) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
+    @staticmethod
+    def _retry_delay(attempt: int) -> float:
+        return min(12.0, 1.5 * (2 ** max(0, attempt - 1)))
+
+    @staticmethod
+    def _is_retryable_http(code: int) -> bool:
+        return code in {408, 409, 429, 500, 502, 503, 504}
+
+    def call_json(self, *, system: str, user: str, settings: AgentSettings | dict[str, Any]) -> dict[str, Any]:
+        settings_dict = settings_to_dict(settings)
+        agent_settings = settings_from_dict(settings_dict)
+
+        payload: dict[str, Any] = {
+            "model": agent_settings.model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
+            "temperature": agent_settings.temperature,
+            "max_tokens": agent_settings.max_output_tokens,
+        }
+        if agent_settings.response_format == "json_object":
+            payload["response_format"] = {"type": "json_object"}
+
+        extra_body = settings_dict.get("extra_body")
+        if isinstance(extra_body, dict):
+            payload.update(extra_body)
+
+        request_payload = dict(payload)
+        notes: list[str] = []
+        temperature_omitted = False
+        max_tokens_omitted = False
+        response_format_omitted = False
+
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                raw = self._post(request_payload)
+                text = extract_chat_response_text(raw)
+                parsed = json.loads(extract_json_block(text))
+                return {
+                    "parsed": parsed,
+                    "text": text,
+                    "raw": raw,
+                    "retry_count": attempt - 1,
+                    "temperature_omitted": temperature_omitted,
+                    "max_tokens_omitted": max_tokens_omitted,
+                    "response_format_omitted": response_format_omitted,
+                    "attempt_notes": notes,
+                }
+            except urllib.error.HTTPError as exc:
+                detail = exc.read().decode("utf-8", errors="replace")
+                try:
+                    error_payload = json.loads(detail)
+                except Exception:
+                    error_payload = None
+                error_info = (error_payload or {}).get("error", {}) if isinstance(error_payload, dict) else {}
+                message = str(error_info.get("message", detail)).lower()
+                param = error_info.get("param")
+
+                if exc.code == 400 and "response_format" in request_payload and (
+                    param == "response_format" or "response_format" in message
+                ):
+                    request_payload = dict(request_payload)
+                    request_payload.pop("response_format", None)
+                    response_format_omitted = True
+                    notes.append("response_format parameter removed and request retried")
+                    continue
+                if exc.code == 400 and "temperature" in request_payload and (
+                    param == "temperature" or "temperature" in message
+                ):
+                    request_payload = dict(request_payload)
+                    request_payload.pop("temperature", None)
+                    temperature_omitted = True
+                    notes.append("temperature parameter removed and request retried")
+                    continue
+                if exc.code == 400 and "max_tokens" in request_payload and (
+                    param == "max_tokens" or "max_tokens" in message
+                ):
+                    request_payload = dict(request_payload)
+                    request_payload.pop("max_tokens", None)
+                    max_tokens_omitted = True
+                    notes.append("max_tokens parameter removed and request retried")
+                    continue
+                if self._is_retryable_http(exc.code) and attempt < self.max_attempts:
+                    notes.append(f"transient chat-completions HTTP {exc.code} on attempt {attempt}: retrying")
+                    time.sleep(self._retry_delay(attempt))
+                    continue
+                raise OpenAIClientError(f"Chat completions HTTP {exc.code}: {detail}") from exc
+            except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+                if attempt < self.max_attempts:
+                    notes.append(f"network timeout/error on attempt {attempt}: {exc}")
+                    time.sleep(self._retry_delay(attempt))
+                    continue
+                raise OpenAIClientError(f"Chat completions request failed after {self.max_attempts} attempts: {exc}") from exc
+            except (ValueError, json.JSONDecodeError) as exc:
+                if attempt < self.max_attempts:
+                    notes.append(f"invalid/empty JSON response on attempt {attempt}: retrying ({exc})")
+                    time.sleep(self._retry_delay(attempt))
+                    continue
+                raise OpenAIClientError(f"Chat completions response did not contain usable JSON: {exc}") from exc
+
+        raise OpenAIClientError("Chat completions request failed without a usable response")

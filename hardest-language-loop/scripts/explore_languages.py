@@ -8,6 +8,7 @@ import platform
 import subprocess
 import sys
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -17,11 +18,11 @@ sys.path.insert(0, str(ROOT))
 from llm_failure_pl.agents import LanguageDesignerAgent, SolverAgent
 from llm_failure_pl.data_store import FileStore
 from llm_failure_pl.interpreter import LanguageSpec, PythonToyInterpreter
-from llm_failure_pl.openai_client import OpenAIClientError, OpenAIResponsesClient
+from llm_failure_pl.openai_client import OpenAIChatCompletionsClient, OpenAIClientError, OpenAIResponsesClient
 from llm_failure_pl.problems import default_problem_set
 from llm_failure_pl.prompts import INTERPRETER_CONTRACT, LANGUAGE_DESIGNER_SYSTEM
-from llm_failure_pl.secrets import get_provider_api_key
-from llm_failure_pl.settings import AgentSettings, default_settings
+from llm_failure_pl.secrets import get_provider_api_key, get_secret
+from llm_failure_pl.settings import AgentSettings, SolverModelSettings, default_settings
 from llm_failure_pl.strategy_tree import StrategyTree
 
 ALLOWED_RULES = {
@@ -301,6 +302,62 @@ def validate_solver_program(language_spec: dict[str, Any], problem: Any, program
     }
 
 
+def solver_client_for_model(model: SolverModelSettings, *, no_api: bool) -> OpenAIResponsesClient | OpenAIChatCompletionsClient | None:
+    if no_api:
+        return None
+    if model.base_url:
+        api_key = get_secret(model.api_key_env) if model.api_key_env else None
+        return OpenAIChatCompletionsClient(
+            api_key=api_key or "EMPTY",
+            base_url=model.base_url,
+            timeout_seconds=model.timeout_seconds,
+            max_attempts=3,
+        )
+    if model.provider == "openai":
+        api_key = get_provider_api_key("openai")
+        if not api_key:
+            return None
+        return OpenAIResponsesClient(api_key, timeout_seconds=model.timeout_seconds, max_attempts=3)
+    return None
+
+
+def run_solver_evaluation(job: dict[str, Any]) -> dict[str, Any]:
+    evaluation = dict(job["evaluation"])
+    client = job.get("client")
+    rendered = job["rendered"]
+    spec = job["language_spec"]
+    problem = job["problem"]
+
+    if client is None:
+        evaluation.update({"error": "no API client/API key", "counted": False})
+        return evaluation
+
+    try:
+        response = client.call_json(system=rendered["system"], user=rendered["user"], settings=rendered["settings"])
+        parsed = response["parsed"]
+        program = parsed.get("program") if isinstance(parsed, dict) else parsed
+        if not isinstance(program, dict):
+            raise ValueError("solver response did not contain a JSON AST object")
+        validation = validate_solver_program(spec, problem, program)
+        evaluation.update(
+            {
+                "request_ok": True,
+                "success": validation["success"],
+                "num_tests": validation["num_tests"],
+                "num_failed": validation["num_failed"],
+                "first_failure_case_id": validation["first_failure_case_id"],
+                "program": program,
+                "validation": validation,
+                "response_text": response["text"],
+                "retry_count": response["retry_count"],
+                "attempt_notes": response["attempt_notes"],
+            }
+        )
+    except (OpenAIClientError, ValueError, KeyError) as exc:
+        evaluation.update({"error": f"{type(exc).__name__}: {exc}", "counted": False})
+    return evaluation
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run a small language-search pilot.")
     parser.add_argument("--candidates", type=int, default=3)
@@ -312,12 +369,19 @@ def main() -> int:
     parser.add_argument("--candidate-file", type=Path, help="Replay candidate languages from a previous run artifact")
     parser.add_argument("--run-id", help="Optional fixed run id; useful for scripted reproductions")
     parser.add_argument("--seed", type=int, help="Record an explicit experiment seed in the manifest")
+    parser.add_argument(
+        "--parallel-workers",
+        type=int,
+        help="Maximum parallel solver requests. Defaults to RunSettings.max_parallel_solver_requests.",
+    )
     args = parser.parse_args()
 
     settings = default_settings()
     if args.seed is not None:
         settings.seed = args.seed
     settings.dry_run = bool(args.no_api)
+    if args.parallel_workers is not None:
+        settings.max_parallel_solver_requests = max(1, args.parallel_workers)
     store = FileStore(settings.data_root)
     paths = store.start_run(settings=settings, run_id=args.run_id)
     tree = LanguageDesignerAgent.new_strategy_tree()
@@ -380,6 +444,8 @@ def main() -> int:
         str(len(problems)),
         "--seed",
         str(settings.seed),
+        "--parallel-workers",
+        str(settings.max_parallel_solver_requests),
     ]
     if args.no_api:
         replay_args.append("--no-api")
@@ -397,6 +463,7 @@ def main() -> int:
         "problem_ids": [problem.problem_id for problem in problems],
         "problem_set_hash": stable_hash([problem.to_dict(include_reference=True, include_hidden=True) for problem in problems]),
         "solver_models": [model.to_dict() for model in settings.solver_models],
+        "max_parallel_solver_requests": settings.max_parallel_solver_requests,
         "language_designer": settings.language_designer.to_dict(),
         "git": git_info(),
         "python": sys.version,
@@ -406,6 +473,7 @@ def main() -> int:
         "notes": [
             "For exact candidate replay, use --candidate-source=file with artifacts/candidate_languages.json from this run.",
             "Solver calls use temperature=0.0, but hosted model APIs can still change over time; compare aggregate rankings, not byte-identical outputs.",
+            "Local vLLM solver endpoints are OpenAI-compatible chat-completions servers and are safe to evaluate in parallel.",
         ],
     }
     store.save_json_artifact(paths, "reproducibility.json", reproducibility)
@@ -431,95 +499,102 @@ def main() -> int:
         print(json.dumps(summary, ensure_ascii=False, indent=2))
         return 0
 
-    combos: list[tuple[dict[str, Any], Any, Any]] = []
+    combos: list[tuple[dict[str, Any], Any, SolverModelSettings, int]] = []
     for problem in problems:
         for candidate in candidates:
             for model in settings.solver_models:
-                combos.append((candidate, problem, model))
+                for repeat_index in range(1, max(1, model.repeats) + 1):
+                    combos.append((candidate, problem, model, repeat_index))
     if args.max_evaluations and args.max_evaluations > 0:
         combos = combos[: args.max_evaluations]
 
-    evaluations: list[dict[str, Any]] = []
-    for eval_index, (candidate, problem, model) in enumerate(combos, start=1):
+    clients_by_model: dict[tuple[str, str, str | None], OpenAIResponsesClient | OpenAIChatCompletionsClient | None] = {}
+    jobs: list[dict[str, Any]] = []
+    for eval_index, (candidate, problem, model, repeat_index) in enumerate(combos, start=1):
         spec = candidate["language_spec"]
         node_id = node_by_candidate[spec["name"]]
         rendered = solver.render(spec, problem.to_solver_task(), solver_model=model.to_dict())
-        eval_id = f"eval-{eval_index:04d}-{spec['name']}-{problem.problem_id}-{model.model}"
+        repeat_suffix = f"-r{repeat_index:02d}" if max(1, model.repeats) > 1 else ""
+        eval_id = f"eval-{eval_index:04d}-{spec['name']}-{problem.problem_id}-{model.model}{repeat_suffix}"
         store.save_json_artifact(paths, f"prompts/{eval_id}.json", rendered)
 
+        client_key = (model.provider, model.model, model.base_url)
+        if client_key not in clients_by_model:
+            clients_by_model[client_key] = solver_client_for_model(model, no_api=args.no_api)
+
         evaluation: dict[str, Any] = {
+            "eval_index": eval_index,
             "eval_id": eval_id,
             "candidate_name": spec["name"],
             "node_id": node_id,
             "problem_id": problem.problem_id,
             "model": model.model,
             "provider": model.provider,
+            "base_url": model.base_url,
+            "repeat_index": repeat_index,
             "request_ok": False,
             "success": False,
         }
+        jobs.append(
+            {
+                "evaluation": evaluation,
+                "rendered": rendered,
+                "language_spec": spec,
+                "problem": problem,
+                "client": clients_by_model[client_key],
+            }
+        )
 
-        if client is None:
-            evaluation.update({"error": "no OpenAI client/API key", "counted": False})
+    evaluations: list[dict[str, Any]] = []
+    max_workers = max(1, min(settings.max_parallel_solver_requests, len(jobs) or 1))
+    if max_workers == 1:
+        completed = [run_solver_evaluation(job) for job in jobs]
+    else:
+        completed = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_by_evaluation = {executor.submit(run_solver_evaluation, job): job["evaluation"] for job in jobs}
+            for future in as_completed(future_by_evaluation):
+                try:
+                    completed.append(future.result())
+                except Exception as exc:  # noqa: BLE001 - preserve the failed evaluation record instead of aborting the run
+                    evaluation = dict(future_by_evaluation[future])
+                    evaluation.update({"error": f"Unexpected worker error: {type(exc).__name__}: {exc}", "counted": False})
+                    completed.append(evaluation)
+
+    for evaluation in sorted(completed, key=lambda item: item.get("eval_index", 0)):
+        node_id = evaluation["node_id"]
+        if evaluation.get("request_ok"):
+            tree.record_result(
+                node_id,
+                {
+                    "success": evaluation["success"],
+                    "model": evaluation["model"],
+                    "provider": evaluation["provider"],
+                    "problem_id": evaluation["problem_id"],
+                    "case_id": evaluation.get("first_failure_case_id"),
+                    "note": f"{evaluation.get('num_failed')}/{evaluation.get('num_tests')} tests failed",
+                },
+            )
+        else:
             tree.record_result(
                 node_id,
                 {
                     "success": False,
                     "counted": False,
-                    "model": model.model,
-                    "problem_id": problem.problem_id,
-                    "note": "No API client; evaluation skipped.",
-                },
-            )
-            evaluations.append(evaluation)
-            continue
-
-        try:
-            response = client.call_json(system=rendered["system"], user=rendered["user"], settings=rendered["settings"])
-            parsed = response["parsed"]
-            program = parsed.get("program") if isinstance(parsed, dict) else parsed
-            if not isinstance(program, dict):
-                raise ValueError("solver response did not contain a JSON AST object")
-            validation = validate_solver_program(spec, problem, program)
-            evaluation.update(
-                {
-                    "request_ok": True,
-                    "success": validation["success"],
-                    "num_tests": validation["num_tests"],
-                    "num_failed": validation["num_failed"],
-                    "first_failure_case_id": validation["first_failure_case_id"],
-                    "program": program,
-                    "validation": validation,
-                    "response_text": response["text"],
-                    "retry_count": response["retry_count"],
-                    "attempt_notes": response["attempt_notes"],
-                }
-            )
-            tree.record_result(
-                node_id,
-                {
-                    "success": validation["success"],
-                    "model": model.model,
-                    "problem_id": problem.problem_id,
-                    "case_id": validation["first_failure_case_id"],
-                    "note": f"{validation['num_failed']}/{validation['num_tests']} tests failed",
-                },
-            )
-        except (OpenAIClientError, ValueError, KeyError) as exc:
-            evaluation.update({"error": f"{type(exc).__name__}: {exc}", "counted": False})
-            tree.record_result(
-                node_id,
-                {
-                    "success": False,
-                    "counted": False,
-                    "model": model.model,
-                    "problem_id": problem.problem_id,
-                    "note": f"Infrastructure/model error: {type(exc).__name__}",
+                    "model": evaluation["model"],
+                    "provider": evaluation["provider"],
+                    "problem_id": evaluation["problem_id"],
+                    "note": f"Infrastructure/model error: {evaluation.get('error', 'unknown error')}",
                 },
             )
         evaluations.append(evaluation)
-        store.save_json_artifact(paths, f"evaluations/{eval_id}.json", evaluation)
+        store.save_json_artifact(paths, f"evaluations/{evaluation['eval_id']}.json", evaluation)
         store.save_tree(paths, tree)
-        store.append_event(paths, "evaluation_completed", {k: evaluation.get(k) for k in ["eval_id", "success", "request_ok", "candidate_name", "problem_id", "model"]})
+        store.append_event(
+            paths,
+            "evaluation_completed",
+            {k: evaluation.get(k) for k in ["eval_id", "success", "request_ok", "candidate_name", "problem_id", "model", "provider"]},
+        )
 
     summary_by_candidate: dict[str, dict[str, Any]] = {}
     for candidate in candidates:

@@ -1,6 +1,6 @@
 # Reproducibility Protocol
 
-_Last updated: 2026-04-24_
+_Last updated: 2026-04-25_
 
 ## Goal
 
@@ -11,7 +11,7 @@ The language-search loop should not depend on one lucky agent generation. Anothe
 3. verify that the benchmark/problem set and candidate set are identical,
 4. compare solver failure rates across runs.
 
-Hosted LLM APIs may still change over time, so the target is **reproducible candidate/search setup and comparable aggregate rankings**, not byte-identical model responses.
+Hosted LLM APIs may still change over time, so the target is **reproducible candidate/search setup and comparable aggregate rankings**, not byte-identical model responses. Local vLLM solver endpoints are recorded with base URLs in run artifacts.
 
 ---
 
@@ -45,7 +45,7 @@ Important hashes:
 Uses the language-designer model to propose candidates, then evaluates them.
 
 ```bash
-python3 scripts/explore_languages.py --candidate-source agent --candidates 6 --problem-limit 6 --seed 20260424
+python3 scripts/explore_languages.py --candidate-source agent --candidates 6 --problem-limit 6 --seed 20260424 --parallel-workers 8
 ```
 
 This is useful for discovery, but candidate generation can vary by model/provider/version. For paper-grade reproduction, save and replay `artifacts/candidate_languages.json`.
@@ -55,7 +55,7 @@ This is useful for discovery, but candidate generation can vary by model/provide
 Uses the deterministic built-in seed catalog, bypassing stochastic candidate generation while still evaluating solver models.
 
 ```bash
-python3 scripts/explore_languages.py --candidate-source seed --candidates 6 --problem-limit 6 --seed 20260424
+python3 scripts/explore_languages.py --candidate-source seed --candidates 6 --problem-limit 6 --seed 20260424 --parallel-workers 8
 ```
 
 This is the baseline reproducibility run. Candidate order and candidate hashes should match across machines using the same code revision.
@@ -70,7 +70,8 @@ python3 scripts/explore_languages.py \
   --candidate-file data/runs/<run_id>/artifacts/candidate_languages.json \
   --candidates 6 \
   --problem-limit 6 \
-  --seed 20260424
+  --seed 20260424 \
+  --parallel-workers 8
 ```
 
 This is the preferred way to reproduce a reported discovery run.
@@ -96,8 +97,9 @@ A reproducibility claim should report at least:
 candidate_set_hash: ...
 problem_set_hash: ...
 code commit: ...
-solver models: gpt-5.4, gpt-4o
+solver models: gpt-5.4, gpt-4o, gemma-4-31b-it, qwen3.6-27b
 temperature: 0.0
+parallel workers: 8 by default
 candidate source: seed_catalog or candidate_file
 ```
 

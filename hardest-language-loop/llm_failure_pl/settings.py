@@ -36,6 +36,10 @@ class SolverModelSettings:
     max_output_tokens: int = 4096
     response_format: str = "json_object"
     repeats: int = 1
+    base_url: str | None = None
+    api_key_env: str | None = None
+    timeout_seconds: int = 120
+    extra_body: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -45,6 +49,25 @@ def default_solver_models() -> list[SolverModelSettings]:
     return [
         SolverModelSettings(provider="openai", model="gpt-5.4", temperature=0.0, thinking="medium"),
         SolverModelSettings(provider="openai", model="gpt-4o", temperature=0.0, thinking="medium"),
+        SolverModelSettings(
+            provider="vllm",
+            model="gemma-4-31b-it",
+            temperature=0.0,
+            thinking="off",
+            base_url="http://100.78.221.93:8000/v1",
+            api_key_env="VLLM_API_KEY",
+            timeout_seconds=120,
+        ),
+        SolverModelSettings(
+            provider="vllm",
+            model="qwen3.6-27b",
+            temperature=0.0,
+            thinking="off",
+            base_url="http://100.78.221.93:8001/v1",
+            api_key_env="VLLM_API_KEY",
+            timeout_seconds=120,
+            extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+        ),
     ]
 
 
@@ -55,6 +78,7 @@ class RunSettings:
     dry_run: bool = True
     seed: int = 20260424
     data_root: str = "data/runs"
+    max_parallel_solver_requests: int = 8
     solver_models: list[SolverModelSettings] = field(default_factory=default_solver_models)
     language_designer: AgentSettings = field(
         default_factory=lambda: AgentSettings(
@@ -91,6 +115,7 @@ class RunSettings:
             "dry_run": self.dry_run,
             "seed": self.seed,
             "data_root": self.data_root,
+            "max_parallel_solver_requests": self.max_parallel_solver_requests,
             "solver_models": [model.to_dict() for model in self.solver_models],
             "language_designer": self.language_designer.to_dict(),
             "solver": self.solver.to_dict(),
