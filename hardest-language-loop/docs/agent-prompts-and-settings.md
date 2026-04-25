@@ -122,7 +122,7 @@ cd hardest-language-loop
 python3 scripts/run_agent_smoke.py
 ```
 
-This creates `data/runs/<run_id>/` with:
+This creates `data/smoke_runs/vN/` with:
 
 - `strategy_tree.json`
 - `events.jsonl`

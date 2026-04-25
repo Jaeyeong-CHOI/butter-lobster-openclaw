@@ -16,6 +16,7 @@ from llm_failure_pl.settings import default_settings
 
 def main() -> int:
     settings = default_settings()
+    settings.data_root = "data/smoke_runs"
     store = FileStore(settings.data_root)
     paths = store.start_run(settings=settings)
 

@@ -10,5 +10,7 @@ data/secrets.json
 data/candidates/
 data/backups/
 data/runs/
+data/smoke_runs/
 data/experiments/*
 !data/experiments/.gitkeep
+loop_result/

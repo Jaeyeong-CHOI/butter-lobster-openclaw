@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 from .settings import RunSettings, default_settings
 from .strategy_tree import StrategyTree
@@ -36,21 +36,21 @@ class FileStore:
     """Append-friendly file store for reproducible experiments.
 
     Layout:
-        data/runs/<run_id>/
+        loop_result/vN/
           manifest.json
           strategy_tree.json
           events.jsonl
           artifacts/
     """
 
-    def __init__(self, data_root: str | Path = "data/runs") -> None:
+    VERSION_RE = re.compile(r"^v(\d+)$")
+
+    def __init__(self, data_root: str | Path = "loop_result") -> None:
         self.data_root = Path(data_root)
 
-    def start_run(self, settings: RunSettings | None = None, run_id: str | None = None) -> RunPaths:
-        settings = settings or default_settings()
-        run_id = run_id or datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S") + "-" + uuid4().hex[:6]
+    def _paths_for(self, run_id: str) -> RunPaths:
         root = self.data_root / run_id
-        paths = RunPaths(
+        return RunPaths(
             run_id=run_id,
             root=root,
             manifest=root / "manifest.json",
@@ -58,6 +58,50 @@ class FileStore:
             events=root / "events.jsonl",
             artifacts=root / "artifacts",
         )
+
+    def _version_numbers(self) -> list[int]:
+        if not self.data_root.exists():
+            return []
+        versions: list[int] = []
+        for path in self.data_root.iterdir():
+            if not path.is_dir():
+                continue
+            match = self.VERSION_RE.match(path.name)
+            if match:
+                versions.append(int(match.group(1)))
+        return sorted(versions)
+
+    def next_version_id(self) -> str:
+        versions = self._version_numbers()
+        return f"v{versions[-1] + 1}" if versions else "v0"
+
+    def latest_version_id(self) -> str | None:
+        versions = self._version_numbers()
+        return f"v{versions[-1]}" if versions else None
+
+    def start_run(self, settings: RunSettings | None = None, run_id: str | None = None, *, resume: bool = False) -> RunPaths:
+        settings = settings or default_settings()
+        run_id = run_id or self.next_version_id()
+        paths = self._paths_for(run_id)
+        if resume:
+            if not paths.root.exists():
+                raise FileNotFoundError(f"Cannot resume missing run folder: {paths.root}")
+            paths.artifacts.mkdir(parents=True, exist_ok=True)
+            if not paths.events.exists():
+                paths.events.write_text("", encoding="utf-8")
+            manifest = {}
+            if paths.manifest.exists():
+                manifest = json.loads(paths.manifest.read_text(encoding="utf-8"))
+            manifest.setdefault("run_id", run_id)
+            manifest.setdefault("created_at", now_iso())
+            manifest.setdefault("schema_version", 1)
+            manifest.setdefault("resume_events", [])
+            manifest["latest_settings"] = settings.to_dict()
+            manifest["resume_events"].append({"resumed_at": now_iso(), "settings": settings.to_dict()})
+            atomic_write_json(paths.manifest, manifest)
+            self.append_event(paths, "run_resumed", {"run_id": run_id})
+            return paths
+
         paths.artifacts.mkdir(parents=True, exist_ok=False)
         atomic_write_json(
             paths.manifest,
@@ -66,6 +110,7 @@ class FileStore:
                 "created_at": now_iso(),
                 "settings": settings.to_dict(),
                 "schema_version": 1,
+                "versioned_result_root": str(self.data_root),
             },
         )
         paths.events.write_text("", encoding="utf-8")

@@ -6,7 +6,7 @@ Clean-slate Python-first scaffold for exploring programming-language semantics t
 
 - Agents are plain Python files.
 - The interpreter is Python-based and executes JSON AST programs.
-- Experiment state is stored as files, not a web UI.
+- Experiment state is stored as versioned files under `loop_result/v0`, `loop_result/v1`, ... by default.
 - The language designer agent owns a strategy tree and can create/mutate nodes based on results.
 - The language designer uses `thinking=extra_high`.
 - Solver benchmarking always includes `gpt-5.4`, `gpt-4o`, local `gemma-4-31b-it` (`100.78.221.93:8000`), and local `qwen3.6-27b` (`100.78.221.93:8001`) with `temperature=0.0`, repeated 10 times per candidate/problem/model.
@@ -71,14 +71,22 @@ python3 scripts/export_problem_set.py
 python3 scripts/explore_languages.py --candidate-source agent --candidates 3 --problem-limit 6 --parallel-workers 8
 ```
 
-This asks the language designer for candidate semantic rules, evaluates each candidate with the configured solver models, validates JSON-AST programs with the Python interpreter, and stores a scored strategy tree under `data/runs/<run_id>/`.
+This asks the language designer for candidate semantic rules, evaluates each candidate with the configured solver models, validates JSON-AST programs with the Python interpreter, and stores a scored strategy tree under the next `loop_result/vN/` folder.
+
+Fresh runs auto-create the next version folder (`v0`, `v1`, ...). To continue an existing folder, use:
+
+```bash
+python3 scripts/explore_languages.py --resume --run-id v0 --candidate-source file --candidate-file loop_result/v0/artifacts/candidate_languages.json
+```
+
+If `--resume` is used without `--run-id`, the latest `vN` folder is resumed. If no `--candidate-source` is provided while resuming and `candidate_languages.json` already exists, the script reuses that candidate file by default and skips completed successful evaluations.
 
 For reproducible runs, use the deterministic seed catalog or replay a saved candidate set:
 
 ```bash
 python3 scripts/explore_languages.py --candidate-source seed --candidates 6 --problem-limit 6 --seed 20260424
-python3 scripts/explore_languages.py --candidate-source file --candidate-file data/runs/<run_id>/artifacts/candidate_languages.json --candidates 6 --problem-limit 6 --seed 20260424
-python3 scripts/compare_runs.py data/runs/<baseline_run_id> data/runs/<replay_run_id>
+python3 scripts/explore_languages.py --candidate-source file --candidate-file loop_result/<version>/artifacts/candidate_languages.json --candidates 6 --problem-limit 6 --seed 20260424
+python3 scripts/compare_runs.py loop_result/<baseline_version> loop_result/<replay_version>
 ```
 
 ## Related work

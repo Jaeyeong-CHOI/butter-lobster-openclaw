@@ -79,7 +79,7 @@ class RunSettings:
 
     dry_run: bool = True
     seed: int = 20260424
-    data_root: str = "data/runs"
+    data_root: str = "loop_result"
     max_parallel_solver_requests: int = 8
     solver_models: list[SolverModelSettings] = field(default_factory=default_solver_models)
     language_designer: AgentSettings = field(

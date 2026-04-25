@@ -30,6 +30,8 @@ Every `scripts/explore_languages.py` run writes:
 - `artifacts/reproducibility.json` — seed, CLI args, candidate/problem hashes, git info, code fingerprints, replay command.
 - `artifacts/replay_command.txt` — command to replay the exact candidate set.
 
+Fresh runs are stored under `loop_result/v0`, `loop_result/v1`, ... by default. The next version is chosen automatically. Use `--result-root <path>` to override the root.
+
 Important hashes:
 
 - `candidate_set_hash`: hash of the ordered candidate language specs.
@@ -67,7 +69,7 @@ Replays a prior run's exact candidate languages.
 ```bash
 python3 scripts/explore_languages.py \
   --candidate-source file \
-  --candidate-file data/runs/<run_id>/artifacts/candidate_languages.json \
+  --candidate-file loop_result/<version>/artifacts/candidate_languages.json \
   --candidates 6 \
   --problem-limit 6 \
   --seed 20260424 \
@@ -76,12 +78,22 @@ python3 scripts/explore_languages.py \
 
 This is the preferred way to reproduce a reported discovery run.
 
+### 4) Resume an existing version folder
+
+Continue an existing result folder instead of creating a new `vN`:
+
+```bash
+python3 scripts/explore_languages.py --resume --run-id v0
+```
+
+If `--run-id` is omitted, `--resume` resumes the latest version. When resuming and no `--candidate-source` is provided, an existing `artifacts/candidate_languages.json` is reused automatically. Previously successful evaluations are skipped, so interrupted runs can continue in place.
+
 ---
 
 ## Compare two runs
 
 ```bash
-python3 scripts/compare_runs.py data/runs/<baseline_run_id> data/runs/<replay_run_id>
+python3 scripts/compare_runs.py loop_result/<baseline_version> loop_result/<replay_version>
 ```
 
 The comparison reports:

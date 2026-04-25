@@ -358,6 +358,28 @@ def run_solver_evaluation(job: dict[str, Any]) -> dict[str, Any]:
     return evaluation
 
 
+def candidate_nodes_by_name(tree: StrategyTree) -> dict[str, str]:
+    nodes: dict[str, str] = {}
+    for node_id, node in tree.nodes.items():
+        spec = node.artifacts.get("language_spec") if isinstance(node.artifacts, dict) else None
+        if isinstance(spec, dict) and isinstance(spec.get("name"), str):
+            nodes[spec["name"]] = node_id
+    return nodes
+
+
+def load_existing_evaluations(paths: Any) -> dict[str, dict[str, Any]]:
+    evaluations_path = paths.artifacts / "evaluations.json"
+    if not evaluations_path.exists():
+        return {}
+    try:
+        data = json.loads(evaluations_path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if not isinstance(data, list):
+        return {}
+    return {item["eval_id"]: item for item in data if isinstance(item, dict) and isinstance(item.get("eval_id"), str)}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run a small language-search pilot.")
     parser.add_argument("--candidates", type=int, default=3)
@@ -367,7 +389,9 @@ def main() -> int:
     parser.add_argument("--generate-only", action="store_true", help="Stop after creating candidate language nodes")
     parser.add_argument("--candidate-source", choices=["agent", "seed", "file"], default="agent")
     parser.add_argument("--candidate-file", type=Path, help="Replay candidate languages from a previous run artifact")
-    parser.add_argument("--run-id", help="Optional fixed run id; useful for scripted reproductions")
+    parser.add_argument("--result-root", type=Path, help="Root folder for versioned loop results. Defaults to loop_result.")
+    parser.add_argument("--run-id", help="Optional version/run id. Defaults to the next vN folder under result-root.")
+    parser.add_argument("--resume", action="store_true", help="Resume an existing result folder. With no --run-id, resumes latest vN.")
     parser.add_argument("--seed", type=int, help="Record an explicit experiment seed in the manifest")
     parser.add_argument(
         "--parallel-workers",
@@ -375,17 +399,30 @@ def main() -> int:
         help="Maximum parallel solver requests. Defaults to RunSettings.max_parallel_solver_requests.",
     )
     args = parser.parse_args()
+    candidate_source_explicit = any(arg == "--candidate-source" or arg.startswith("--candidate-source=") for arg in sys.argv[1:])
 
     settings = default_settings()
+    if args.result_root is not None:
+        settings.data_root = str(args.result_root)
     if args.seed is not None:
         settings.seed = args.seed
     settings.dry_run = bool(args.no_api)
     if args.parallel_workers is not None:
         settings.max_parallel_solver_requests = max(1, args.parallel_workers)
     store = FileStore(settings.data_root)
-    paths = store.start_run(settings=settings, run_id=args.run_id)
-    tree = LanguageDesignerAgent.new_strategy_tree()
+    run_id = args.run_id
+    if args.resume and run_id is None:
+        run_id = store.latest_version_id()
+        if run_id is None:
+            parser.error("--resume requested but no vN folders exist under result-root")
+    paths = store.start_run(settings=settings, run_id=run_id, resume=args.resume)
+    tree = store.load_tree(paths) if args.resume and paths.strategy_tree.exists() else LanguageDesignerAgent.new_strategy_tree()
     solver = SolverAgent(settings.solver)
+
+    existing_candidate_file = paths.artifacts / "candidate_languages.json"
+    if args.resume and not candidate_source_explicit and not args.candidate_file and existing_candidate_file.exists():
+        args.candidate_source = "file"
+        args.candidate_file = existing_candidate_file
 
     api_key = None if args.no_api else get_provider_api_key("openai")
     client = OpenAIResponsesClient(api_key, timeout_seconds=120, max_attempts=3) if api_key else None
@@ -408,9 +445,11 @@ def main() -> int:
     store.save_json_artifact(paths, "designer_response.json", designer_info)
     store.append_event(paths, "designer_candidates_ready", {"count": len(candidates), "source": designer_info.get("source")})
 
-    node_by_candidate: dict[str, str] = {}
+    node_by_candidate: dict[str, str] = candidate_nodes_by_name(tree)
     for idx, candidate in enumerate(candidates):
         spec = candidate["language_spec"]
+        if spec["name"] in node_by_candidate:
+            continue
         node = tree.add_child(
             tree.root_id,
             title=candidate["title"],
@@ -434,6 +473,8 @@ def main() -> int:
     replay_args = [
         "python3",
         "scripts/explore_languages.py",
+        "--result-root",
+        str(settings.data_root),
         "--candidate-source",
         "file",
         "--candidate-file",
@@ -449,10 +490,16 @@ def main() -> int:
     ]
     if args.no_api:
         replay_args.append("--no-api")
+    args_payload = {key: (str(value) if isinstance(value, Path) else value) for key, value in vars(args).items()}
+    args_payload["candidate_file"] = str(args.candidate_file) if args.candidate_file else None
+    args_payload["result_root"] = str(args.result_root) if args.result_root else None
     reproducibility = {
         "schema_version": 1,
         "seed": settings.seed,
-        "args": vars(args) | {"candidate_file": str(args.candidate_file) if args.candidate_file else None},
+        "args": args_payload,
+        "result_root": str(settings.data_root),
+        "run_id": paths.run_id,
+        "resume": args.resume,
         "candidate_source": designer_info.get("source"),
         "candidate_count": len(candidates),
         "candidate_hashes": {
@@ -474,6 +521,7 @@ def main() -> int:
             "For exact candidate replay, use --candidate-source=file with artifacts/candidate_languages.json from this run.",
             "Solver calls use temperature=0.0, but hosted model APIs can still change over time; compare aggregate rankings, not byte-identical outputs.",
             "Local vLLM solver endpoints are OpenAI-compatible chat-completions servers and are safe to evaluate in parallel.",
+            "Fresh runs auto-create the next loop_result/vN folder. Use --resume --run-id vN to continue an existing folder.",
         ],
     }
     store.save_json_artifact(paths, "reproducibility.json", reproducibility)
@@ -483,6 +531,7 @@ def main() -> int:
         summary = {
             "run_id": paths.run_id,
             "run_dir": str(paths.root),
+            "resumed": args.resume,
             "designer_source": designer_info.get("source"),
             "candidate_count": len(candidates),
             "problem_count": len(problems),
@@ -508,6 +557,9 @@ def main() -> int:
     if args.max_evaluations and args.max_evaluations > 0:
         combos = combos[: args.max_evaluations]
 
+    existing_evaluations = load_existing_evaluations(paths) if args.resume else {}
+    skipped_existing: list[dict[str, Any]] = []
+    skipped_existing_ids: set[str] = set()
     clients_by_model: dict[tuple[str, str, str | None], OpenAIResponsesClient | OpenAIChatCompletionsClient | None] = {}
     jobs: list[dict[str, Any]] = []
     for eval_index, (candidate, problem, model, repeat_index) in enumerate(combos, start=1):
@@ -517,6 +569,12 @@ def main() -> int:
         repeat_suffix = f"-r{repeat_index:02d}" if max(1, model.repeats) > 1 else ""
         eval_id = f"eval-{eval_index:04d}-{spec['name']}-{problem.problem_id}-{model.model}{repeat_suffix}"
         store.save_json_artifact(paths, f"prompts/{eval_id}.json", rendered)
+
+        existing_evaluation = existing_evaluations.get(eval_id)
+        if existing_evaluation and existing_evaluation.get("request_ok"):
+            skipped_existing.append(existing_evaluation)
+            skipped_existing_ids.add(eval_id)
+            continue
 
         client_key = (model.provider, model.model, model.base_url)
         if client_key not in clients_by_model:
@@ -561,8 +619,11 @@ def main() -> int:
                     evaluation.update({"error": f"Unexpected worker error: {type(exc).__name__}: {exc}", "counted": False})
                     completed.append(evaluation)
 
-    for evaluation in sorted(completed, key=lambda item: item.get("eval_index", 0)):
+    for evaluation in sorted([*skipped_existing, *completed], key=lambda item: item.get("eval_index", 0)):
         node_id = evaluation["node_id"]
+        evaluations.append(evaluation)
+        if evaluation.get("eval_id") in skipped_existing_ids:
+            continue
         if evaluation.get("request_ok"):
             tree.record_result(
                 node_id,
@@ -587,7 +648,6 @@ def main() -> int:
                     "note": f"Infrastructure/model error: {evaluation.get('error', 'unknown error')}",
                 },
             )
-        evaluations.append(evaluation)
         store.save_json_artifact(paths, f"evaluations/{evaluation['eval_id']}.json", evaluation)
         store.save_tree(paths, tree)
         store.append_event(
@@ -616,12 +676,14 @@ def main() -> int:
     summary = {
         "run_id": paths.run_id,
         "run_dir": str(paths.root),
+        "resumed": args.resume,
         "designer_source": designer_info.get("source"),
         "candidate_count": len(candidates),
         "problem_count": len(problems),
         "candidate_set_hash": reproducibility["candidate_set_hash"],
         "problem_set_hash": reproducibility["problem_set_hash"],
         "requested_evaluations": len(combos),
+        "skipped_existing_evaluations": len(skipped_existing),
         "completed_model_requests": sum(1 for item in evaluations if item.get("request_ok")),
         "infrastructure_errors": sum(1 for item in evaluations if not item.get("request_ok")),
         "by_candidate": summary_by_candidate,
