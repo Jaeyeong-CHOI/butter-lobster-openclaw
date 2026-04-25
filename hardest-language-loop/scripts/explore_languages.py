@@ -418,16 +418,49 @@ def candidate_nodes_by_name(tree: StrategyTree) -> dict[str, str]:
     return nodes
 
 
-def load_existing_evaluations(paths: Any) -> dict[str, dict[str, Any]]:
-    evaluations: dict[str, dict[str, Any]] = {}
+EvaluationKey = tuple[str, str, str, int]
 
-    def add_item(item: Any) -> None:
-        if not isinstance(item, dict) or not isinstance(item.get("eval_id"), str):
+
+def evaluation_key(candidate_name: Any, problem_id: Any, model: Any, repeat_index: Any) -> EvaluationKey | None:
+    if not candidate_name or not problem_id or not model:
+        return None
+    try:
+        repeat = int(repeat_index or 1)
+    except Exception:
+        repeat = 1
+    return (str(candidate_name), str(problem_id), str(model), repeat)
+
+
+def evaluation_key_from_item(item: dict[str, Any]) -> EvaluationKey | None:
+    return evaluation_key(item.get("candidate_name"), item.get("problem_id"), item.get("model"), item.get("repeat_index"))
+
+
+def reuse_existing_evaluation(existing: dict[str, Any], current: dict[str, Any]) -> dict[str, Any]:
+    reused = dict(existing)
+    if existing.get("eval_id") != current.get("eval_id"):
+        reused["source_eval_id"] = existing.get("eval_id")
+    if existing.get("eval_index") != current.get("eval_index"):
+        reused["source_eval_index"] = existing.get("eval_index")
+    for key in ["eval_index", "eval_id", "candidate_name", "node_id", "problem_id", "model", "provider", "base_url", "repeat_index"]:
+        reused[key] = current.get(key)
+    return reused
+
+
+def load_existing_evaluations(paths: Any) -> dict[EvaluationKey, dict[str, Any]]:
+    evaluations: dict[EvaluationKey, dict[str, Any]] = {}
+
+    def add_item(item: Any, *, source: str, tree_recorded: bool) -> None:
+        if not isinstance(item, dict):
             return
-        eval_id = item["eval_id"]
-        previous = evaluations.get(eval_id)
-        if previous is None or (item.get("request_ok") and not previous.get("request_ok")):
-            evaluations[eval_id] = item
+        key = evaluation_key_from_item(item)
+        if key is None:
+            return
+        enriched = dict(item)
+        enriched["_existing_source"] = source
+        enriched["_tree_recorded"] = tree_recorded
+        previous = evaluations.get(key)
+        if previous is None or (enriched.get("request_ok") and not previous.get("request_ok")):
+            evaluations[key] = enriched
 
     evaluations_path = paths.artifacts / "evaluations.json"
     if evaluations_path.exists():
@@ -435,7 +468,17 @@ def load_existing_evaluations(paths: Any) -> dict[str, dict[str, Any]]:
             data = json.loads(evaluations_path.read_text(encoding="utf-8"))
             if isinstance(data, list):
                 for item in data:
-                    add_item(item)
+                    add_item(item, source="evaluations.json", tree_recorded=True)
+        except Exception:
+            pass
+
+    partial_path = paths.artifacts / "evaluations.partial.json"
+    if partial_path.exists():
+        try:
+            data = json.loads(partial_path.read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                for item in data:
+                    add_item(item, source="evaluations.partial.json", tree_recorded=False)
         except Exception:
             pass
 
@@ -443,7 +486,7 @@ def load_existing_evaluations(paths: Any) -> dict[str, dict[str, Any]]:
     if evaluations_dir.exists():
         for path in evaluations_dir.glob("eval-*.json"):
             try:
-                add_item(json.loads(path.read_text(encoding="utf-8")))
+                add_item(json.loads(path.read_text(encoding="utf-8")), source="evaluations/*.json", tree_recorded=False)
             except Exception:
                 continue
 
@@ -882,16 +925,6 @@ def main() -> int:
         eval_id = f"eval-{eval_index:04d}-{spec['name']}-{problem.problem_id}-{model.model}{repeat_suffix}"
         store.save_json_artifact(paths, f"prompts/{eval_id}.json", rendered)
 
-        existing_evaluation = existing_evaluations.get(eval_id)
-        if existing_evaluation and existing_evaluation.get("request_ok"):
-            skipped_existing.append(existing_evaluation)
-            skipped_existing_ids.add(eval_id)
-            continue
-
-        client_key = (model.provider, model.model, model.base_url)
-        if client_key not in clients_by_model:
-            clients_by_model[client_key] = solver_client_for_model(model, no_api=args.no_api)
-
         evaluation: dict[str, Any] = {
             "eval_index": eval_index,
             "eval_id": eval_id,
@@ -905,6 +938,17 @@ def main() -> int:
             "request_ok": False,
             "success": False,
         }
+
+        existing_evaluation = existing_evaluations.get(evaluation_key(spec["name"], problem.problem_id, model.model, repeat_index))
+        if existing_evaluation and existing_evaluation.get("request_ok"):
+            skipped_existing.append(reuse_existing_evaluation(existing_evaluation, evaluation))
+            skipped_existing_ids.add(eval_id)
+            continue
+
+        client_key = (model.provider, model.model, model.base_url)
+        if client_key not in clients_by_model:
+            clients_by_model[client_key] = solver_client_for_model(model, no_api=args.no_api)
+
         jobs.append(
             {
                 "evaluation": evaluation,
@@ -961,7 +1005,9 @@ def main() -> int:
     for evaluation in sorted([*skipped_existing, *completed], key=lambda item: item.get("eval_index", 0)):
         node_id = evaluation["node_id"]
         evaluations.append(evaluation)
-        if evaluation.get("eval_id") in skipped_existing_ids:
+        already_recorded = evaluation.get("eval_id") in skipped_existing_ids and evaluation.get("_tree_recorded")
+        if already_recorded:
+            store.save_json_artifact(paths, f"evaluations/{evaluation['eval_id']}.json", evaluation)
             continue
         if evaluation.get("request_ok"):
             tree.record_result(
