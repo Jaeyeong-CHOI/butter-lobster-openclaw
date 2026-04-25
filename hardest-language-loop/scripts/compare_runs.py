@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_RUN_ROOT = ROOT / "data" / "runs"
+DEFAULT_RUN_ROOT = ROOT / "loop_result"
 
 
 def resolve_run(value: str) -> Path:

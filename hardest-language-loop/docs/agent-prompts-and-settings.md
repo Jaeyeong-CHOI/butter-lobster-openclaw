@@ -115,6 +115,13 @@ Supported operations are deliberately small:
 {"op": "record_result", "node_id": "...", "result": {"case_id": "...", "success": false, "note": "..."}}
 ```
 
+During `scripts/explore_languages.py` evaluation runs, solver outcomes are written back into the tree in two layers:
+
+1. per-attempt `record_result` history and metrics on each candidate node;
+2. aggregate `latest_evaluation_summary` artifacts on candidate nodes and the root.
+
+The same run writes `artifacts/expansion_plan.json` and, unless `--expand-after-eval 0` is used, appends result-guided diverse candidate nodes for the next loop round.
+
 ## Run smoke test
 
 ```bash

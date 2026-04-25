@@ -59,6 +59,14 @@ def stable_hash(data: Any) -> str:
     return hashlib.sha256(canonical_json(data).encode("utf-8")).hexdigest()[:16]
 
 
+def candidate_hashes(candidates: list[dict[str, Any]]) -> dict[str, str]:
+    return {candidate["language_spec"]["name"]: stable_hash(candidate["language_spec"]) for candidate in candidates}
+
+
+def candidate_set_hash(candidates: list[dict[str, Any]]) -> str:
+    return stable_hash([candidate["language_spec"] for candidate in candidates])
+
+
 def file_sha256(path: Path) -> str | None:
     if not path.exists():
         return None
@@ -423,6 +431,217 @@ def load_existing_evaluations(paths: Any) -> dict[str, dict[str, Any]]:
     return {item["eval_id"]: item for item in data if isinstance(item, dict) and isinstance(item.get("eval_id"), str)}
 
 
+def changed_semantic_rules(rules: dict[str, str]) -> dict[str, str]:
+    return {key: value for key, value in rules.items() if DEFAULT_RULES.get(key) != value}
+
+
+def summarize_evaluations_by_candidate(evaluations: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    summaries: dict[str, dict[str, Any]] = {}
+    for item in evaluations:
+        name = item.get("candidate_name")
+        if not name or not item.get("request_ok"):
+            continue
+        summary = summaries.setdefault(
+            name,
+            {
+                "candidate_name": name,
+                "trials": 0,
+                "successes": 0,
+                "failures": 0,
+                "failure_rate": None,
+                "model_stats": {},
+                "problem_stats": {},
+                "first_failure_case_ids": [],
+            },
+        )
+        success = bool(item.get("success"))
+        summary["trials"] += 1
+        summary["successes"] += int(success)
+        summary["failures"] += int(not success)
+        if not success and item.get("first_failure_case_id"):
+            failure_case = item["first_failure_case_id"]
+            if failure_case not in summary["first_failure_case_ids"]:
+                summary["first_failure_case_ids"].append(failure_case)
+
+        for bucket, key in (("model_stats", item.get("model")), ("problem_stats", item.get("problem_id"))):
+            if not key:
+                continue
+            stats = summary[bucket].setdefault(key, {"trials": 0, "successes": 0, "failures": 0, "failure_rate": None})
+            stats["trials"] += 1
+            stats["successes"] += int(success)
+            stats["failures"] += int(not success)
+            stats["failure_rate"] = stats["failures"] / stats["trials"] if stats["trials"] else None
+
+    for summary in summaries.values():
+        summary["failure_rate"] = summary["failures"] / summary["trials"] if summary["trials"] else None
+    return summaries
+
+
+def annotate_tree_with_result_summaries(
+    tree: StrategyTree,
+    node_by_candidate: dict[str, str],
+    candidate_summaries: dict[str, dict[str, Any]],
+) -> dict[str, Any]:
+    ranked = sorted(
+        candidate_summaries.values(),
+        key=lambda item: (float(item.get("failure_rate") or 0.0), int(item.get("trials") or 0)),
+        reverse=True,
+    )
+    for name, summary in candidate_summaries.items():
+        node_id = node_by_candidate.get(name)
+        if not node_id:
+            continue
+        node = tree.attach_artifact(node_id, "latest_evaluation_summary", summary)
+        rate = summary.get("failure_rate")
+        rate_text = "n/a" if rate is None else f"{rate:.3f}"
+        note = f"aggregate_result: trials={summary['trials']} failures={summary['failures']} failure_rate={rate_text}"
+        if not node.notes or node.notes[-1] != note:
+            node.notes.append(note)
+
+    global_summary = {
+        "evaluated_candidates": len(candidate_summaries),
+        "top_failure_candidates": [
+            {
+                "candidate_name": item["candidate_name"],
+                "trials": item["trials"],
+                "failures": item["failures"],
+                "failure_rate": item["failure_rate"],
+            }
+            for item in ranked[:20]
+        ],
+    }
+    tree.attach_artifact(tree.root_id, "latest_evaluation_summary", global_summary)
+    return global_summary
+
+
+def hamming_rules(left: dict[str, str], right: dict[str, str]) -> int:
+    return sum(1 for key in DEFAULT_RULES if left.get(key) != right.get(key))
+
+
+def result_guided_expansion_candidates(
+    candidates: list[dict[str, Any]],
+    node_by_candidate: dict[str, str],
+    candidate_summaries: dict[str, dict[str, Any]],
+    limit: int,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    if limit <= 0:
+        return [], {"reason": "disabled", "requested": limit}
+
+    existing_rules = {tuple(sorted(candidate["language_spec"]["semantic_rules"].items())) for candidate in candidates}
+    existing_names = {candidate["language_spec"]["name"] for candidate in candidates}
+    all_grid = fallback_candidates(1000)
+    pool = [
+        candidate
+        for candidate in all_grid
+        if candidate["language_spec"]["name"] not in existing_names
+        and tuple(sorted(candidate["language_spec"]["semantic_rules"].items())) not in existing_rules
+    ]
+    if not pool:
+        return [], {"reason": "candidate_grid_exhausted", "requested": limit}
+
+    candidate_by_name = {candidate["language_spec"]["name"]: candidate for candidate in candidates}
+    evaluated = [
+        summary
+        for summary in candidate_summaries.values()
+        if summary.get("trials") and summary.get("candidate_name") in candidate_by_name
+    ]
+    high_failure = sorted(
+        evaluated,
+        key=lambda item: (float(item.get("failure_rate") or 0.0), int(item.get("trials") or 0)),
+        reverse=True,
+    )[:50]
+
+    family_counts: dict[str, int] = defaultdict(int)
+    pair_counts: dict[tuple[str, ...], int] = defaultdict(int)
+    for candidate in candidates:
+        changed = changed_semantic_rules(candidate["language_spec"]["semantic_rules"])
+        families = tuple(sorted(changed)) or ("baseline",)
+        pair_counts[families] += 1
+        for family in families:
+            family_counts[family] += 1
+
+    scored: list[tuple[float, dict[str, Any], dict[str, Any]]] = []
+    for candidate in pool:
+        rules = candidate["language_spec"]["semantic_rules"]
+        changed = changed_semantic_rules(rules)
+        families = tuple(sorted(changed)) or ("baseline",)
+        diversity_score = sum(1.0 / (1 + family_counts[family]) for family in families)
+        combo_score = 1.0 / (1 + pair_counts[families])
+        exploit_score = 0.0
+        parent_id = None
+        parent_candidate = None
+        nearest_distance = None
+        for summary in high_failure:
+            base_candidate = candidate_by_name[summary["candidate_name"]]
+            distance = hamming_rules(rules, base_candidate["language_spec"]["semantic_rules"])
+            if distance == 0:
+                continue
+            score = float(summary.get("failure_rate") or 0.0) / distance
+            if score > exploit_score:
+                exploit_score = score
+                parent_candidate = summary["candidate_name"]
+                parent_id = node_by_candidate.get(parent_candidate)
+                nearest_distance = distance
+        score = exploit_score + diversity_score + combo_score + (0.03 * len(changed))
+        scored.append(
+            (
+                score,
+                candidate,
+                {
+                    "score": round(score, 6),
+                    "exploit_score": round(exploit_score, 6),
+                    "diversity_score": round(diversity_score, 6),
+                    "combo_score": round(combo_score, 6),
+                    "changed_families": list(families),
+                    "parent_candidate": parent_candidate,
+                    "parent_id": parent_id,
+                    "nearest_distance": nearest_distance,
+                },
+            )
+        )
+
+    selected: list[dict[str, Any]] = []
+    selected_meta: list[dict[str, Any]] = []
+    selected_family_counts: dict[str, int] = defaultdict(int)
+    for _, candidate, meta in sorted(scored, key=lambda item: item[0], reverse=True):
+        families = meta["changed_families"]
+        if selected and all(selected_family_counts[family] >= max(2, limit // 5) for family in families):
+            continue
+        selected.append(candidate)
+        selected_meta.append(meta)
+        for family in families:
+            selected_family_counts[family] += 1
+        if len(selected) >= limit:
+            break
+
+    if len(selected) < limit:
+        selected_names = {candidate["language_spec"]["name"] for candidate in selected}
+        for _, candidate, meta in sorted(scored, key=lambda item: item[0], reverse=True):
+            if candidate["language_spec"]["name"] in selected_names:
+                continue
+            selected.append(candidate)
+            selected_meta.append(meta)
+            if len(selected) >= limit:
+                break
+
+    plan = {
+        "requested": limit,
+        "selected": len(selected),
+        "pool_size": len(pool),
+        "evaluated_candidates": len(evaluated),
+        "selection_policy": "exploit high-failure neighborhoods while giving underrepresented semantic families a diversity bonus",
+        "candidates": [
+            {
+                "candidate_name": candidate["language_spec"]["name"],
+                "semantic_rules": candidate["language_spec"]["semantic_rules"],
+                **meta,
+            }
+            for candidate, meta in zip(selected, selected_meta, strict=True)
+        ],
+    }
+    return selected, plan
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run a small language-search pilot.")
     parser.add_argument("--candidates", type=int, default=3)
@@ -436,6 +655,12 @@ def main() -> int:
     parser.add_argument("--run-id", help="Optional version/run id. Defaults to the next vN folder under result-root.")
     parser.add_argument("--resume", action="store_true", help="Resume an existing result folder. With no --run-id, resumes latest vN.")
     parser.add_argument("--seed", type=int, help="Record an explicit experiment seed in the manifest")
+    parser.add_argument(
+        "--expand-after-eval",
+        type=int,
+        default=25,
+        help="Append this many result-guided diverse candidate languages after an evaluation batch. Use 0 to disable.",
+    )
     parser.add_argument(
         "--parallel-workers",
         type=int,
@@ -545,11 +770,8 @@ def main() -> int:
         "resume": args.resume,
         "candidate_source": designer_info.get("source"),
         "candidate_count": len(candidates),
-        "candidate_hashes": {
-            candidate["language_spec"]["name"]: stable_hash(candidate["language_spec"])
-            for candidate in candidates
-        },
-        "candidate_set_hash": stable_hash([candidate["language_spec"] for candidate in candidates]),
+        "candidate_hashes": candidate_hashes(candidates),
+        "candidate_set_hash": candidate_set_hash(candidates),
         "problem_ids": [problem.problem_id for problem in problems],
         "problem_set_hash": stable_hash([problem.to_dict(include_reference=True, include_hidden=True) for problem in problems]),
         "solver_models": [model.to_dict() for model in settings.solver_models],
@@ -565,6 +787,7 @@ def main() -> int:
             "Solver calls use temperature=0.0, but hosted model APIs can still change over time; compare aggregate rankings, not byte-identical outputs.",
             "Local vLLM solver endpoints are OpenAI-compatible chat-completions servers and are safe to evaluate in parallel.",
             "Fresh runs auto-create the next loop_result/vN folder. Use --resume --run-id vN to continue an existing folder.",
+            "After evaluation, aggregate results are attached to strategy-tree nodes and a result-guided diversity expansion can append new candidates for the next loop round.",
         ],
     }
     store.save_json_artifact(paths, "reproducibility.json", reproducibility)
@@ -699,6 +922,59 @@ def main() -> int:
             {k: evaluation.get(k) for k in ["eval_id", "success", "request_ok", "candidate_name", "problem_id", "model", "provider"]},
         )
 
+    candidate_summaries = summarize_evaluations_by_candidate(evaluations)
+    global_result_summary = annotate_tree_with_result_summaries(tree, node_by_candidate, candidate_summaries)
+    store.save_json_artifact(paths, "candidate_result_summary.json", candidate_summaries)
+
+    expansion_plan: dict[str, Any] = {
+        "requested": args.expand_after_eval,
+        "selected": 0,
+        "reason": "no_counted_evaluation_results" if not candidate_summaries else "disabled",
+    }
+    expanded_candidates: list[dict[str, Any]] = []
+    if candidate_summaries and args.expand_after_eval > 0:
+        expanded_candidates, expansion_plan = result_guided_expansion_candidates(
+            candidates,
+            node_by_candidate,
+            candidate_summaries,
+            args.expand_after_eval,
+        )
+        meta_by_name = {item["candidate_name"]: item for item in expansion_plan.get("candidates", [])}
+        for idx, candidate in enumerate(expanded_candidates, start=len(candidates)):
+            spec = candidate["language_spec"]
+            meta = meta_by_name.get(spec["name"], {})
+            parent_id = meta.get("parent_id") or tree.root_id
+            tags = [*candidate.get("tags", []), "candidate-language", "result-guided-expansion"]
+            for family in meta.get("changed_families", []):
+                tag = f"family:{family}"
+                if tag not in tags:
+                    tags.append(tag)
+            node = tree.add_child(
+                parent_id,
+                title=candidate["title"],
+                hypothesis=candidate["hypothesis"],
+                tags=tags,
+                artifacts={"language_spec": spec, "candidate_index": idx, "expansion_meta": meta},
+                note="Result-guided diversity expansion candidate for the next loop round.",
+            )
+            node_by_candidate[spec["name"]] = node.id
+        if expanded_candidates:
+            candidates.extend(expanded_candidates)
+            store.save_json_artifact(paths, "candidate_languages.json", candidates)
+            store.append_event(paths, "result_guided_expansion", {"added": len(expanded_candidates), "requested": args.expand_after_eval})
+    store.save_json_artifact(paths, "expansion_plan.json", expansion_plan)
+    store.save_tree(paths, tree)
+
+    reproducibility["candidate_count"] = len(candidates)
+    reproducibility["candidate_hashes"] = candidate_hashes(candidates)
+    reproducibility["candidate_set_hash"] = candidate_set_hash(candidates)
+    reproducibility["result_guided_expansion"] = {
+        "requested": args.expand_after_eval,
+        "added": len(expanded_candidates),
+        "candidate_names": [candidate["language_spec"]["name"] for candidate in expanded_candidates],
+    }
+    store.save_json_artifact(paths, "reproducibility.json", reproducibility)
+
     summary_by_candidate: dict[str, dict[str, Any]] = {}
     for candidate in candidates:
         spec = candidate["language_spec"]
@@ -722,6 +998,8 @@ def main() -> int:
         "resumed": args.resume,
         "designer_source": designer_info.get("source"),
         "candidate_count": len(candidates),
+        "initial_candidate_count": len(candidates) - len(expanded_candidates),
+        "expanded_candidate_count": len(expanded_candidates),
         "problem_count": len(problems),
         "candidate_set_hash": reproducibility["candidate_set_hash"],
         "problem_set_hash": reproducibility["problem_set_hash"],
@@ -729,6 +1007,8 @@ def main() -> int:
         "skipped_existing_evaluations": len(skipped_existing),
         "completed_model_requests": sum(1 for item in evaluations if item.get("request_ok")),
         "infrastructure_errors": sum(1 for item in evaluations if not item.get("request_ok")),
+        "result_summary": global_result_summary,
+        "expansion_plan": expansion_plan,
         "by_candidate": summary_by_candidate,
         "best_node": tree.best_node_for_expansion().to_dict(),
     }

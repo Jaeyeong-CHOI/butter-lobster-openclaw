@@ -73,6 +73,12 @@ python3 scripts/explore_languages.py --candidate-source agent --candidates 3 --p
 
 This asks the language designer for candidate semantic rules, evaluates each candidate with the configured solver models, validates JSON-AST programs with the Python interpreter, and stores a scored strategy tree under the next `loop_result/vN/` folder.
 
+After an evaluation batch, the loop also writes aggregate result summaries back into the strategy tree and appends result-guided diverse candidates for the next round (`--expand-after-eval 25` by default, set `0` to disable). The result artifacts are:
+
+- `artifacts/candidate_result_summary.json`
+- `artifacts/expansion_plan.json`
+- updated `strategy_tree.json` node artifacts/metrics
+
 Fresh runs auto-create the next version folder (`v0`, `v1`, ...). To continue an existing folder, use:
 
 ```bash

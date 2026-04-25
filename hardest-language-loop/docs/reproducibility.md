@@ -26,6 +26,8 @@ Every `scripts/explore_languages.py` run writes:
 - `artifacts/problem_set.json` — exact public+hidden benchmark cases.
 - `artifacts/prompts/*.json` — exact solver prompts sent per evaluation.
 - `artifacts/evaluations/*.json` — solver output, validation results, retry notes.
+- `artifacts/candidate_result_summary.json` — aggregate pass/fail summaries by candidate, model, and problem.
+- `artifacts/expansion_plan.json` — result-guided diversity expansion candidates for the next loop round.
 - `artifacts/summary.json` — aggregate failure rates and hashes.
 - `artifacts/reproducibility.json` — seed, CLI args, candidate/problem hashes, git info, code fingerprints, replay command.
 - `artifacts/replay_command.txt` — command to replay the exact candidate set.
@@ -87,6 +89,16 @@ python3 scripts/explore_languages.py --resume --run-id v0
 ```
 
 If `--run-id` is omitted, `--resume` resumes the latest version. When resuming and no `--candidate-source` is provided, an existing `artifacts/candidate_languages.json` is reused automatically. Previously successful evaluations are skipped, so interrupted runs can continue in place.
+
+### Result-guided tree expansion
+
+By default, an evaluation run appends up to 25 new candidate languages after the batch:
+
+```bash
+python3 scripts/explore_languages.py --resume --run-id v0 --expand-after-eval 25
+```
+
+The expansion policy uses tree-recorded failure rates to exploit neighborhoods around hard candidates while adding a diversity bonus for underrepresented semantic families. Set `--expand-after-eval 0` for a pure evaluation pass with no new candidates.
 
 ---
 
