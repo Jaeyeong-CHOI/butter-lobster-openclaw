@@ -87,6 +87,21 @@ python3 scripts/explore_languages.py --resume --run-id v0 --candidate-source fil
 
 If `--resume` is used without `--run-id`, the latest `vN` folder is resumed. If no `--candidate-source` is provided while resuming and `candidate_languages.json` already exists, the script reuses that candidate file by default and skips completed successful evaluations.
 
+## Iterative 10-at-a-time loop
+
+For the main search loop, run 10 candidates at a time: generate/evaluate/review/expand, repeated until a target archive size is reached.
+
+```bash
+python3 scripts/run_iterative_loop.py \
+  --run-id v1 \
+  --target-candidates 300 \
+  --batch-size 10 \
+  --problem-limit 6 \
+  --parallel-workers 8
+```
+
+This writes progress to `loop_result/v1/artifacts/iterative_loop_state.json` and per-iteration logs to `loop_result/v1/artifacts/iteration_logs/`.
+
 For reproducible runs, use the deterministic seed catalog or replay a saved candidate set:
 
 ```bash

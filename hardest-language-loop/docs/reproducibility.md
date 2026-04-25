@@ -100,6 +100,21 @@ python3 scripts/explore_languages.py --resume --run-id v0 --expand-after-eval 25
 
 The expansion policy uses tree-recorded failure rates to exploit neighborhoods around hard candidates while adding a diversity bonus for underrepresented semantic families. Set `--expand-after-eval 0` for a pure evaluation pass with no new candidates.
 
+### 10-at-a-time iterative loop
+
+Use `scripts/run_iterative_loop.py` to automate the full loop:
+
+```bash
+python3 scripts/run_iterative_loop.py --run-id v1 --target-candidates 300 --batch-size 10 --problem-limit 6 --parallel-workers 8
+```
+
+Each iteration calls `explore_languages.py` on the current version folder, evaluates newly added candidates, records aggregate summaries in the tree, then appends the next result-guided batch. The orchestrator writes:
+
+- `artifacts/iterative_loop_state.json`
+- `artifacts/iteration_logs/*.log`
+
+By default it performs a final no-expansion evaluation pass once the target candidate count is reached, so the final appended batch is evaluated too. Use `--no-final-evaluate` to skip that final pass.
+
 ---
 
 ## Compare two runs

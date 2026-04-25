@@ -122,6 +122,8 @@ During `scripts/explore_languages.py` evaluation runs, solver outcomes are writt
 
 The same run writes `artifacts/expansion_plan.json` and, unless `--expand-after-eval 0` is used, appends result-guided diverse candidate nodes for the next loop round.
 
+`scripts/run_iterative_loop.py` wraps this into the main loop pattern: 10 candidates → evaluation → tree/result review → 10 new result-guided candidates, repeated until the requested target count.
+
 ## Run smoke test
 
 ```bash

@@ -224,7 +224,7 @@ def load_candidate_file(path: Path, limit: int) -> list[dict[str, Any]]:
             continue
         seen_rules.add(key)
         candidates.append(candidate)
-        if len(candidates) >= limit:
+        if limit > 0 and len(candidates) >= limit:
             break
     if not candidates:
         raise ValueError(f"candidate file did not contain any executable candidates: {path}")
@@ -668,6 +668,7 @@ def main() -> int:
     )
     args = parser.parse_args()
     candidate_source_explicit = any(arg == "--candidate-source" or arg.startswith("--candidate-source=") for arg in sys.argv[1:])
+    candidates_explicit = any(arg == "--candidates" or arg.startswith("--candidates=") for arg in sys.argv[1:])
 
     settings = default_settings()
     if args.result_root is not None:
@@ -691,6 +692,8 @@ def main() -> int:
     if args.resume and not candidate_source_explicit and not args.candidate_file and existing_candidate_file.exists():
         args.candidate_source = "file"
         args.candidate_file = existing_candidate_file
+        if not candidates_explicit:
+            args.candidates = 0
 
     api_key = None if args.no_api else get_provider_api_key("openai")
     client = OpenAIResponsesClient(api_key, timeout_seconds=120, max_attempts=3) if api_key else None
