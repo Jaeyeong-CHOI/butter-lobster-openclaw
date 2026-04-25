@@ -362,7 +362,7 @@ def solver_client_for_model(model: SolverModelSettings, *, no_api: bool) -> Open
             api_key=api_key or "EMPTY",
             base_url=model.base_url,
             timeout_seconds=model.timeout_seconds,
-            max_attempts=3,
+            max_attempts=1,
         )
     if model.provider == "openai":
         api_key = get_provider_api_key("openai")
@@ -419,16 +419,53 @@ def candidate_nodes_by_name(tree: StrategyTree) -> dict[str, str]:
 
 
 def load_existing_evaluations(paths: Any) -> dict[str, dict[str, Any]]:
+    evaluations: dict[str, dict[str, Any]] = {}
+
+    def add_item(item: Any) -> None:
+        if not isinstance(item, dict) or not isinstance(item.get("eval_id"), str):
+            return
+        eval_id = item["eval_id"]
+        previous = evaluations.get(eval_id)
+        if previous is None or (item.get("request_ok") and not previous.get("request_ok")):
+            evaluations[eval_id] = item
+
     evaluations_path = paths.artifacts / "evaluations.json"
-    if not evaluations_path.exists():
-        return {}
-    try:
-        data = json.loads(evaluations_path.read_text(encoding="utf-8"))
-    except Exception:
-        return {}
-    if not isinstance(data, list):
-        return {}
-    return {item["eval_id"]: item for item in data if isinstance(item, dict) and isinstance(item.get("eval_id"), str)}
+    if evaluations_path.exists():
+        try:
+            data = json.loads(evaluations_path.read_text(encoding="utf-8"))
+            if isinstance(data, list):
+                for item in data:
+                    add_item(item)
+        except Exception:
+            pass
+
+    evaluations_dir = paths.artifacts / "evaluations"
+    if evaluations_dir.exists():
+        for path in evaluations_dir.glob("eval-*.json"):
+            try:
+                add_item(json.loads(path.read_text(encoding="utf-8")))
+            except Exception:
+                continue
+
+    return evaluations
+
+
+def save_incremental_evaluation(
+    store: FileStore,
+    paths: Any,
+    evaluation: dict[str, Any],
+    *,
+    completed: list[dict[str, Any]],
+    skipped_existing: list[dict[str, Any]],
+    flush_every: int,
+) -> None:
+    store.save_json_artifact(paths, f"evaluations/{evaluation['eval_id']}.json", evaluation)
+    if flush_every > 0 and len(completed) % flush_every == 0:
+        store.save_json_artifact(
+            paths,
+            "evaluations.partial.json",
+            sorted([*skipped_existing, *completed], key=lambda item: item.get("eval_index", 0)),
+        )
 
 
 def changed_semantic_rules(rules: dict[str, str]) -> dict[str, str]:
@@ -666,6 +703,12 @@ def main() -> int:
         type=int,
         help="Maximum parallel solver requests. Defaults to RunSettings.max_parallel_solver_requests.",
     )
+    parser.add_argument(
+        "--flush-every",
+        type=int,
+        default=50,
+        help="Write completed evaluation artifacts every N finished solver jobs.",
+    )
     args = parser.parse_args()
     candidate_source_explicit = any(arg == "--candidate-source" or arg.startswith("--candidate-source=") for arg in sys.argv[1:])
     candidates_explicit = any(arg == "--candidates" or arg.startswith("--candidates=") for arg in sys.argv[1:])
@@ -874,8 +917,20 @@ def main() -> int:
 
     evaluations: list[dict[str, Any]] = []
     max_workers = max(1, min(settings.max_parallel_solver_requests, len(jobs) or 1))
+    flush_every = max(0, args.flush_every)
     if max_workers == 1:
-        completed = [run_solver_evaluation(job) for job in jobs]
+        completed = []
+        for job in jobs:
+            evaluation = run_solver_evaluation(job)
+            completed.append(evaluation)
+            save_incremental_evaluation(
+                store,
+                paths,
+                evaluation,
+                completed=completed,
+                skipped_existing=skipped_existing,
+                flush_every=flush_every,
+            )
     else:
         completed = []
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -887,6 +942,21 @@ def main() -> int:
                     evaluation = dict(future_by_evaluation[future])
                     evaluation.update({"error": f"Unexpected worker error: {type(exc).__name__}: {exc}", "counted": False})
                     completed.append(evaluation)
+                save_incremental_evaluation(
+                    store,
+                    paths,
+                    completed[-1],
+                    completed=completed,
+                    skipped_existing=skipped_existing,
+                    flush_every=flush_every,
+                )
+
+    if completed:
+        store.save_json_artifact(
+            paths,
+            "evaluations.partial.json",
+            sorted([*skipped_existing, *completed], key=lambda item: item.get("eval_index", 0)),
+        )
 
     for evaluation in sorted([*skipped_existing, *completed], key=lambda item: item.get("eval_index", 0)):
         node_id = evaluation["node_id"]

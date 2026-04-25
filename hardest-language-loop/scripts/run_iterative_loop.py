@@ -87,6 +87,7 @@ def build_explore_cmd(
     seed: int | None = None,
     max_evaluations: int = 0,
     no_api: bool = False,
+    flush_every: int = 50,
 ) -> list[str]:
     cmd = [
         sys.executable,
@@ -101,6 +102,8 @@ def build_explore_cmd(
         str(parallel_workers),
         "--expand-after-eval",
         str(expand_after_eval),
+        "--flush-every",
+        str(flush_every),
     ]
     if resume:
         cmd.append("--resume")
@@ -132,6 +135,7 @@ def main() -> int:
     parser.add_argument("--resume", action="store_true", help="Continue an existing run folder instead of creating it from scratch.")
     parser.add_argument("--no-final-evaluate", action="store_true", help="Stop once target candidates exist; do not evaluate the final appended batch.")
     parser.add_argument("--max-evaluations-per-iteration", type=int, default=0, help="Testing/debug cap passed to explore_languages.py.")
+    parser.add_argument("--flush-every", type=int, default=50, help="Write completed evaluation artifacts every N finished solver jobs.")
     parser.add_argument("--no-api", action="store_true", help="Testing/debug mode: do not call model APIs.")
     args = parser.parse_args()
 
@@ -155,6 +159,7 @@ def main() -> int:
         "parallel_workers": args.parallel_workers,
         "candidate_source": args.candidate_source,
         "max_evaluations_per_iteration": args.max_evaluations_per_iteration,
+        "flush_every": args.flush_every,
         "no_api": args.no_api,
         "final_evaluate": not args.no_final_evaluate,
         "iterations": [],
@@ -181,6 +186,7 @@ def main() -> int:
                 seed=args.seed,
                 max_evaluations=args.max_evaluations_per_iteration,
                 no_api=args.no_api,
+                flush_every=args.flush_every,
             )
             log_path = log_root / f"iteration_{iteration:03d}_initial.log"
             code = run_step(cmd, log_path=log_path, env=os.environ.copy())
@@ -207,6 +213,7 @@ def main() -> int:
                 seed=args.seed,
                 max_evaluations=args.max_evaluations_per_iteration,
                 no_api=args.no_api,
+                flush_every=args.flush_every,
             )
             log_path = log_root / f"iteration_{iteration:03d}_expand_to_{current_count + expand:04d}.log"
             code = run_step(cmd, log_path=log_path, env=os.environ.copy())
@@ -240,6 +247,7 @@ def main() -> int:
                 seed=args.seed,
                 max_evaluations=args.max_evaluations_per_iteration,
                 no_api=args.no_api,
+                flush_every=args.flush_every,
             )
             log_path = log_root / f"iteration_{iteration:03d}_final_evaluate.log"
             code = run_step(cmd, log_path=log_path, env=os.environ.copy())
