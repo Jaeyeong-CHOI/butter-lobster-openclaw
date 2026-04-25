@@ -47,13 +47,14 @@ class SolverModelSettings:
 
 def default_solver_models() -> list[SolverModelSettings]:
     return [
-        SolverModelSettings(provider="openai", model="gpt-5.4", temperature=0.0, thinking="medium"),
-        SolverModelSettings(provider="openai", model="gpt-4o", temperature=0.0, thinking="medium"),
+        SolverModelSettings(provider="openai", model="gpt-5.4", temperature=0.0, thinking="medium", repeats=10),
+        SolverModelSettings(provider="openai", model="gpt-4o", temperature=0.0, thinking="medium", repeats=10),
         SolverModelSettings(
             provider="vllm",
             model="gemma-4-31b-it",
             temperature=0.0,
             thinking="off",
+            repeats=10,
             base_url="http://100.78.221.93:8000/v1",
             api_key_env="VLLM_API_KEY",
             timeout_seconds=120,
@@ -63,6 +64,7 @@ def default_solver_models() -> list[SolverModelSettings]:
             model="qwen3.6-27b",
             temperature=0.0,
             thinking="off",
+            repeats=10,
             base_url="http://100.78.221.93:8001/v1",
             api_key_env="VLLM_API_KEY",
             timeout_seconds=120,
