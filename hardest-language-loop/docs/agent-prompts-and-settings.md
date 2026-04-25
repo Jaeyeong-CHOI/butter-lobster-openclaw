@@ -22,16 +22,16 @@ Defaults are in `llm_failure_pl/settings.py`.
 
 | Agent | Role | Model | Temperature | Thinking | Output |
 |---|---|---:|---:|---|---|
-| `language_designer` | Generate candidate languages and maintain the strategy tree | `gpt-5.4` | `0.8` | `extra_high` | JSON object |
-| `solver` default | Solve tasks by producing JSON AST programs | `gpt-5.4` | `0.0` | `medium` | JSON object |
+| `language_designer` | Generate candidate languages and maintain the strategy tree | `gpt-5.5` | `0.8` | `extra_high` | JSON object |
+| `solver` default | Solve tasks by producing JSON AST programs | `gpt-5.5` | `0.0` | `medium` | JSON object |
 | `curator` | Read results and recommend tree edits | `gpt-5.5` | `0.3` | `high` | JSON object |
 
 Solver benchmark pool:
 
 | Provider | Model | Temperature | Thinking | Repeats |
 |---|---:|---:|---|---:|
-| `openai` | `gpt-5.4` | `0.0` | `medium` | `10` |
-| `openai` | `gpt-4o` | `0.0` | `medium` | `10` |
+| `openai` | `gpt-5.5` | `0.0` | `medium` | `10` |
+| `openai` | `gpt-4o-mini` | `0.0` | `medium` | `10` |
 | `vllm` | `gemma-4-31b-it` @ `http://100.78.221.93:8000/v1` | `0.0` | `off` | `10` |
 | `vllm` | `qwen3.6-27b` @ `http://100.78.221.93:8001/v1` | `0.0` | `off` | `10` |
 

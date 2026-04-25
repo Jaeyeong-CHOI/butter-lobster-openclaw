@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import itertools
 import json
 import platform
 import subprocess
@@ -39,6 +40,14 @@ DEFAULT_RULES = {
     "comparison_semantics": "normal",
     "arithmetic_semantics": "normal",
     "literal_semantics": "normal",
+}
+
+RULE_VALUES = {
+    "truthiness": ["python", "inverted", "zero_true", "empty_true", "nonempty_false"],
+    "if_semantics": ["normal", "inverted"],
+    "comparison_semantics": ["normal", "inverted", "swapped_order"],
+    "arithmetic_semantics": ["normal", "plus_minus_swapped", "subtraction_reversed", "multiplication_as_addition"],
+    "literal_semantics": ["normal", "numeric_negated", "bool_inverted"],
 }
 
 
@@ -152,6 +161,40 @@ def fallback_candidates(limit: int) -> list[dict[str, Any]]:
             },
         },
     ]
+    seen_rules = {tuple(sorted(candidate["language_spec"]["semantic_rules"].items())) for candidate in candidates}
+
+    rule_keys = list(DEFAULT_RULES.keys())
+    for values in itertools.product(*(RULE_VALUES[key] for key in rule_keys)):
+        rules = dict(zip(rule_keys, values, strict=True))
+        if rules == DEFAULT_RULES:
+            continue
+        key = tuple(sorted(rules.items()))
+        if key in seen_rules:
+            continue
+        changed = {rule_key: value for rule_key, value in rules.items() if value != DEFAULT_RULES[rule_key]}
+        slug = "__".join(f"{rule_key.replace('_semantics', '').replace('_', '-')}-{value.replace('_', '-')}" for rule_key, value in changed.items())
+        title = ", ".join(f"{rule_key.replace('_semantics', '').replace('_', ' ')}={value}" for rule_key, value in changed.items())
+        tags = ["seed", "grid", *[rule_key.replace("_semantics", "") for rule_key in changed]]
+        candidates.append(
+            {
+                "title": title,
+                "hypothesis": (
+                    "A deterministic grid candidate testing whether solvers can operationalize "
+                    f"the combined semantic shifts: {', '.join(f'{k}={v}' for k, v in changed.items())}."
+                ),
+                "tags": tags,
+                "language_spec": {
+                    "name": f"grid-{slug}-v0",
+                    "description": "JSON-AST language with deterministic seed-catalog semantic shifts: "
+                    + ", ".join(f"{k}={v}" for k, v in changed.items())
+                    + ".",
+                    "semantic_rules": rules,
+                },
+            }
+        )
+        seen_rules.add(key)
+        if len(candidates) >= limit:
+            break
     return candidates[:limit]
 
 

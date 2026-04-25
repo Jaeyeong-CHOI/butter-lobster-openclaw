@@ -47,8 +47,8 @@ class SolverModelSettings:
 
 def default_solver_models() -> list[SolverModelSettings]:
     return [
-        SolverModelSettings(provider="openai", model="gpt-5.4", temperature=0.0, thinking="medium", repeats=10),
-        SolverModelSettings(provider="openai", model="gpt-4o", temperature=0.0, thinking="medium", repeats=10),
+        SolverModelSettings(provider="openai", model="gpt-5.5", temperature=0.0, thinking="medium", repeats=10),
+        SolverModelSettings(provider="openai", model="gpt-4o-mini", temperature=0.0, thinking="medium", repeats=10),
         SolverModelSettings(
             provider="vllm",
             model="gemma-4-31b-it",
@@ -87,7 +87,7 @@ class RunSettings:
             name="language_designer",
             role="Generate candidate languages and maintain the strategy tree",
             provider="openai",
-            model="gpt-5.4",
+            model="gpt-5.5",
             temperature=0.8,
             thinking="extra_high",
             max_output_tokens=12000,
@@ -98,7 +98,7 @@ class RunSettings:
             name="solver",
             role="Solve tasks in a candidate language using JSON AST programs",
             provider="openai",
-            model="gpt-5.4",
+            model="gpt-5.5",
             temperature=0.0,
             thinking="medium",
         )
@@ -107,6 +107,8 @@ class RunSettings:
         default_factory=lambda: AgentSettings(
             name="curator",
             role="Read experiment results and recommend strategy-tree edits",
+            provider="openai",
+            model="gpt-5.5",
             temperature=0.3,
             thinking="high",
         )
