@@ -33,6 +33,10 @@ agent-prompts/prompts/research/
 # =========================================
 # Local sub-project folders/symlinks
 # =========================================
+# Heartbeat/local worktrees and scratch trash
+.trash/
+sovereign-ai-korea-eval/
+
 *_ARCHIVE/
 *_DATA/
 *_QUERY_GEN/
